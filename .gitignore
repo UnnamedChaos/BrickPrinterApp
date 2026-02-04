@@ -1,0 +1,28 @@
+## .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+.buildlog/
+*.user
+*.userosscache
+*.sln.docstates
+
+## JetBrains Rider
+.idea/
+*.sln.iml
+*.orig
+
+## User-spezifische Konfigurationen (Wichtig für DI)
+appsettings.Development.json
+appsettings.Local.json
+
+## Betriebssystem
+.DS_Store
+Thumbs.db
+
+## Veröffentlichte Dateien (Single File Executables)
+*.exe
+*.dll
+*.pdb
+*.pfx
