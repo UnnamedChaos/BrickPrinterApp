@@ -27,7 +27,8 @@ dotnet clean
 ### Dependency Injection Setup
 
 The application uses Microsoft.Extensions.Hosting for DI configuration (Program.cs:20-35):
-- `IDisplayService` / `DisplayService`: Singleton - handles image conversion and HTTP transmission
+- `IDisplayService` / `DisplayService`: Singleton - converts images to 1-bit binary format
+- `ITransferService` / `TransferService`: Singleton - handles HTTP transmission of binary data
 - `SettingService`: Singleton - manages ESP32 IP address configuration
 - `SettingsForm`: Transient - settings dialog instantiated on demand
 - `BrickPrinter`: Transient - main form (hidden, runs in tray)
@@ -36,14 +37,21 @@ The application uses Microsoft.Extensions.Hosting for DI configuration (Program.
 
 **BrickPrinter (Forms/BrickPrinter.cs)**
 - Main form that runs minimized in the system tray
-- Initializes a 60-second timer (line 64) to auto-send images via `_displayService.SendImageAsync()`
+- Initializes a 60-second timer (line 71) that converts image to binary and sends via TransferService
 - Tray menu provides "Jetzt Updaten" (manual update), "Einstellungen" (settings), and "Beenden" (exit)
 - Uses `_host.Services.GetRequiredService<SettingsForm>()` to open settings dialog
+- Orchestrates the flow: Image → DisplayService (binary conversion) → TransferService (HTTP POST)
 
 **DisplayService (Services/DisplayService.cs)**
 - Converts 128x64 pixel images to 1-bit raw format (1024 bytes) for OLED display
-- Sends binary data to ESP32 via HTTP POST to `http://{IP}/upload`
+- Returns byte[] via `ConvertImageToBinary()` - does not handle transmission
 - `ConvertTo1BitRaw()` packs 8 vertical pixels per byte in column-major order
+
+**TransferService (Services/TransferService.cs)**
+- Handles HTTP transmission of binary data to ESP32
+- Sends data via POST to `http://{IP}/upload` with content-type `application/octet-stream`
+- Returns bool indicating success/failure of transmission
+- Designed to be reusable by future services that generate binary content
 
 **SettingService (Services/SettingService.cs)**
 - Stores ESP32 IP address (default: 192.168.178.50)

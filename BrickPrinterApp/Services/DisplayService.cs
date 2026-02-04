@@ -1,25 +1,18 @@
-﻿using System.Net.Http.Headers;
-using BrickPrinterApp.Interfaces;
+﻿using BrickPrinterApp.Interfaces;
 
 namespace BrickPrinterApp.Services;
 
-public class DisplayService(HttpClient httpClient, SettingService settings) : IDisplayService
+public class DisplayService : IDisplayService
 {
     private const int ScreenHeight = 64;
     private const int ScreenWidth = 128;
 
-    public async Task<bool> SendImageAsync(Image image)
+    public byte[] ConvertImageToBinary(Image image)
     {
         if (image.Width != ScreenWidth || image.Height != ScreenHeight)
             throw new ArgumentException("Bild muss exakt 128x64 Pixel groß sein.");
 
-        var binaryData = ConvertTo1BitRaw(new Bitmap(image));
-
-        using var content = new ByteArrayContent(binaryData);
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-
-        var response = await httpClient.PostAsync(settings.EndpointUrl, content);
-        return response.IsSuccessStatusCode;
+        return ConvertTo1BitRaw(new Bitmap(image));
     }
 
     private static byte[] ConvertTo1BitRaw(Bitmap bmp)

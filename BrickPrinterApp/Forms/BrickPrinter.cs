@@ -10,11 +10,12 @@ public partial class BrickPrinter : Form
     private readonly IDisplayService _displayService;
     private readonly IHost _host;
     private readonly Image _image;
+    private readonly ITransferService _transferService;
     private Timer? _minuteTimer;
     private NotifyIcon? _trayIcon;
     private ContextMenuStrip? _trayMenu;
 
-    public BrickPrinter(IDisplayService displayService, IHost host)
+    public BrickPrinter(IDisplayService displayService, ITransferService transferService, IHost host)
     {
         InitializeComponent();
         _image = Image.FromFile("Resources/img.PNG");
@@ -27,6 +28,7 @@ public partial class BrickPrinter : Form
         ShowInTaskbar = false;
 
         _displayService = displayService;
+        _transferService = transferService;
         _host = host;
     }
 
@@ -34,7 +36,7 @@ public partial class BrickPrinter : Form
     {
         // 1. Das Tray-Menü erstellen (Rechtsklick-Optionen)
         _trayMenu = new ContextMenuStrip();
-        _trayMenu.Items.Add("Jetzt Updaten", null, async (_, _) => await _displayService.SendImageAsync(_image));
+        _trayMenu.Items.Add("Jetzt Updaten", null, SendUpdate());
         _trayMenu.Items.Add("-"); // Trennlinie
         _trayMenu.Items.Add("Beenden", null, (_, _) => Application.Exit());
 
@@ -49,12 +51,26 @@ public partial class BrickPrinter : Form
         _trayIcon.Visible = true;
 
         // Im Konstruktor von BrickPrinter oder wo du das Menü aufbaust:
-        _trayMenu.Items.Add("Einstellungen", null, (s, e) =>
+        _trayMenu.Items.Add("Einstellungen", null, OpenSettings());
+    }
+
+    private EventHandler? OpenSettings()
+    {
+        return (s, e) =>
         {
             // Wir holen uns eine frische Instanz des SettingsForm
             var settingsForm = _host.Services.GetRequiredService<SettingsForm>();
             settingsForm.ShowDialog(); // Öffnet es als Modal-Fenster
-        });
+        };
+    }
+
+    private EventHandler? SendUpdate()
+    {
+        return async (_, _) =>
+        {
+            var binaryData = _displayService.ConvertImageToBinary(_image);
+            await _transferService.SendBinaryDataAsync(binaryData);
+        };
     }
 
     private void RegisterTimer()
@@ -62,7 +78,11 @@ public partial class BrickPrinter : Form
         // 3. Den Timer für jede Minute starten
         _minuteTimer = new Timer();
         _minuteTimer.Interval = 60000; // 60.000 ms = 1 Minute
-        _minuteTimer.Tick += async (s, e) => await _displayService.SendImageAsync(_image);
+        _minuteTimer.Tick += async (s, e) =>
+        {
+            var binaryData = _displayService.ConvertImageToBinary(_image);
+            await _transferService.SendBinaryDataAsync(binaryData);
+        };
         _minuteTimer.Start();
     }
 

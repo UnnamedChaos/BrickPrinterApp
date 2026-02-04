@@ -2,5 +2,5 @@
 
 public interface IDisplayService
 {
-    Task<bool> SendImageAsync(Image image);
+    byte[] ConvertImageToBinary(Image image);
 }
