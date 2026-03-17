@@ -4,12 +4,10 @@ namespace BrickPrinterApp.Services;
 
 public class DisplayService : IDisplayService
 {
-    private const int ScreenHeight = 64;
-    private const int ScreenWidth = 128;
 
     public byte[] ConvertImageToBinary(Image image)
     {
-        if (image.Width != ScreenWidth || image.Height != ScreenHeight)
+        if (image.Width != SettingService.ScreenWidth || image.Height != SettingService.ScreenHeight)
             throw new ArgumentException("Bild muss exakt 128x64 Pixel groß sein.");
 
         return ConvertTo1BitRaw(new Bitmap(image));
@@ -20,14 +18,17 @@ public class DisplayService : IDisplayService
         var buffer = new byte[1024];
         var idx = 0;
 
-        for (var y = 0; y < ScreenHeight; y += 8)
-        for (var x = 0; x < ScreenWidth; x++)
+        for (var y = 0; y < SettingService.ScreenHeight; y += 8)
+        for (var x = 0; x < SettingService.ScreenWidth; x++)
         {
             byte colByte = 0;
             for (var bit = 0; bit < 8; bit++)
             {
                 var pixel = bmp.GetPixel(x, y + bit);
-                if (pixel.R > ScreenWidth)
+                // Berechne Helligkeit: Durchschnitt von R, G, B
+                var brightness = (pixel.R + pixel.G + pixel.B) / 3;
+                // Pixel ist "gesetzt" (weiß) wenn Helligkeit über 128
+                if (brightness > 128)
                     colByte |= (byte)(1 << bit);
             }
 

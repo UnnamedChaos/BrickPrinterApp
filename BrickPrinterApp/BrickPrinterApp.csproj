@@ -14,15 +14,21 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Meadow.Foundation.Graphics.MicroGraphics" Version="2.5.0.5-beta" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2"/>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2"/>
         <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.2"/>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.5-beta1" />
     </ItemGroup>
 
     <ItemGroup>
         <Compile Update="Forms\SettingsForm.cs">
             <SubType>Form</SubType>
         </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="output\" />
     </ItemGroup>
 
 </Project>

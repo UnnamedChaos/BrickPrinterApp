@@ -27,6 +27,9 @@ internal static class Program
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<IDisplayService, DisplayService>();
         builder.Services.AddSingleton<ITransferService, TransferService>();
+        builder.Services.AddSingleton<ITextService, RawTextService>();
+        builder.Services.AddHttpClient<IWotService, WotService>(); // HttpClient für WotService
+        builder.Services.AddSingleton<IWotDisplayService, WotDisplayService>(); // WoT Display Service
         builder.Services.AddSingleton<SettingService>(); // Singleton: Eine Instanz für die ganze App
         builder.Services.AddTransient<SettingsForm>(); // Transient: Jedes Mal ein neues Fenster-Objekt
         builder.Services.AddTransient<BrickPrinter>();

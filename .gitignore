@@ -26,3 +26,6 @@ Thumbs.db
 *.dll
 *.pdb
 *.pfx
+
+## BrickPrinterDev output folder
+BrickPrinterDev/output/
