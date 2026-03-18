@@ -21,8 +21,9 @@ static bool displayInitialized[NUM_DISPLAYS] = {false, false, false};
 // Switch I2C pins (your working pattern)
 static void switchBus(uint8_t screenId) {
     Wire.end();
-    delay(1);
+    delay(screenId == 2 ? 5 : 1);  // Screen 2 needs longer delay (strapping pins)
     Wire.begin(sdaPins[screenId], sclPins[screenId]);
+    delay(1);
 }
 
 bool displayIsValidScreen(uint8_t screenId) {

@@ -1,4 +1,5 @@
 using BrickPrinterApp.Interfaces;
+using BrickPrinterApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Timer = System.Windows.Forms.Timer;
@@ -12,11 +13,12 @@ public partial class BrickPrinter : Form
     private readonly Image _image;
     private readonly ITransferService _transferService;
     private readonly ITextService _textService;
+    private readonly SettingService _settings;
     private Timer? _minuteTimer;
     private NotifyIcon? _trayIcon;
     private ContextMenuStrip? _trayMenu;
 
-    public BrickPrinter(IDisplayService displayService, ITransferService transferService, ITextService textService, IHost host)
+    public BrickPrinter(IDisplayService displayService, ITransferService transferService, ITextService textService, SettingService settings, IHost host)
     {
         InitializeComponent();
         _image = Image.FromFile("Resources/img.PNG");
@@ -30,6 +32,7 @@ public partial class BrickPrinter : Form
         _displayService = displayService;
         _transferService = transferService;
         _textService = textService;
+        _settings = settings;
         _host = host;
 
         // Start keep-alive to maintain connection (ping every 15 seconds)
@@ -79,12 +82,11 @@ public partial class BrickPrinter : Form
                 "Status: OK",
                 $"Zeit: {DateTime.Now:HH:mm:ss}",
                 $"Datum: {DateTime.Now:dd.MM.yyyy}",
-                "============",
-                "============",
+                $"Screen: {_settings.SelectedScreen}",
             };
 
             var binaryData = _textService.ConvertTextToBinary(sampleLines);
-            await _transferService.SendBinaryDataAsync(binaryData);
+            await _transferService.SendBinaryDataAsync(binaryData, _settings.SelectedScreen);
         };
     }
 
@@ -96,7 +98,7 @@ public partial class BrickPrinter : Form
         _minuteTimer.Tick += async (s, e) =>
         {
             var binaryData = _displayService.ConvertImageToBinary(_image);
-            //await _transferService.SendBinaryDataAsync(binaryData);
+            //await _transferService.SendBinaryDataAsync(binaryData, _settings.SelectedScreen);
         };
         _minuteTimer.Start();
     }

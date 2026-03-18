@@ -1,4 +1,4 @@
-# ESP32 Multi-Display Receiver
+# ESP32-C3 Multi-Display Receiver
 
 Receives 1024 bytes of binary display data via HTTP POST and shows it on up to 3x 128x64 SSD1306 I2C OLED displays.
 
@@ -6,46 +6,48 @@ Receives 1024 bytes of binary display data via HTTP POST and shows it on up to 3
 
 - 3 independent displays on different I2C pins
 - WiFi credentials configurable via USB serial (no code changes needed)
+- **OTA updates** - upload firmware over WiFi (no USB needed after first flash)
 - API accepts `?screen=X` parameter to target specific display
 - Keep-alive support for fast transfers
 
 ## File Structure
 
 ```
-ESP32/
-├── esp32_display.ino   # Main sketch (WiFi setup, main loop)
+ESP32/esp32_display/
+├── esp32_display.ino   # Main sketch (WiFi setup, OTA, main loop)
 ├── display.h           # Display interface
 ├── display.cpp         # Display implementation (3x SSD1306)
 ├── webserver.h         # Web server interface
 ├── webserver.cpp       # Web server implementation (endpoints)
 ├── config.h            # Configuration interface
 ├── config.cpp          # Serial config + Preferences storage
-├── platformio.ini      # PlatformIO configuration
-└── README.md
+└── platformio.ini      # PlatformIO configuration
 ```
 
 ## Hardware Requirements
 
-- ESP32 development board
+- ESP32-C3 development board
 - 1-3x SSD1306 128x64 OLED displays (I2C)
 
 ## Wiring
 
 | Display | SDA Pin | SCL Pin |
 |---------|---------|---------|
-| 0       | GPIO 21 | GPIO 22 |
-| 1       | GPIO 17 | GPIO 16 |
-| 2       | GPIO 32 | GPIO 33 |
+| 0       | GPIO 6  | GPIO 7  |
+| 1       | GPIO 4  | GPIO 5  |
+| 2       | GPIO 2  | GPIO 3  |
 
 All displays: VCC → 3.3V, GND → GND
 
-## Setup
+## Initial Setup (USB - only needed once)
 
 ### Option 1: PlatformIO (Recommended)
 
 1. Open folder in VS Code with PlatformIO extension
-2. Build and upload: `pio run -t upload`
-3. Configure WiFi via serial (see below)
+2. Hold **BOOT** button on ESP32-C3
+3. Build and upload: `pio run -t upload`
+4. Release BOOT when upload starts
+5. Configure WiFi via serial (see below)
 
 ### Option 2: Arduino IDE
 
@@ -55,8 +57,32 @@ All displays: VCC → 3.3V, GND → GND
    - Adafruit GFX Library
    - ESPAsyncWebServer
    - AsyncTCP
-3. Select board: "ESP32 Dev Module"
-4. Upload
+3. Select board: **"ESP32C3 Dev Module"**
+4. Set "USB CDC On Boot": **Enabled**
+5. Hold BOOT, click Upload, release when uploading
+6. Configure WiFi via serial
+
+## OTA Updates (WiFi - no USB needed!)
+
+After the first USB flash, you can update over WiFi:
+
+### Arduino IDE
+1. Tools → Port → Select network port **"ESP32_Display at 192.168.x.x"**
+2. Click Upload
+
+### PlatformIO
+```bash
+# Replace with your ESP32's IP address
+pio run -t upload --upload-port 192.168.178.xxx
+```
+
+### Or edit platformio.ini:
+```ini
+upload_protocol = espota
+upload_port = 192.168.178.xxx
+```
+
+The display shows "OTA Update" with progress during upload.
 
 ## WiFi Configuration (USB Serial)
 
