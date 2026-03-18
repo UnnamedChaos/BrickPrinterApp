@@ -1,0 +1,12 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.iteragpt.iteratec.de/",
+    "ANTHROPIC_AUTH_TOKEN": "sk-93tRALdyr6gfu5r2T1yU6A",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gcp/claude-opus-4-5",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gcp/claude-sonnet-4-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gcp/claude-haiku-4-5",
+    "DISABLE_PROMPT_CACHING": "0",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1"
+  }
+}

@@ -24,14 +24,19 @@ internal static class Program
 
     private static void RegisterServices(HostApplicationBuilder builder)
     {
-        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<SettingService>();
         builder.Services.AddSingleton<IDisplayService, DisplayService>();
-        builder.Services.AddSingleton<ITransferService, TransferService>();
         builder.Services.AddSingleton<ITextService, RawTextService>();
-        builder.Services.AddHttpClient<IWotService, WotService>(); // HttpClient für WotService
-        builder.Services.AddSingleton<IWotDisplayService, WotDisplayService>(); // WoT Display Service
-        builder.Services.AddSingleton<SettingService>(); // Singleton: Eine Instanz für die ganze App
-        builder.Services.AddTransient<SettingsForm>(); // Transient: Jedes Mal ein neues Fenster-Objekt
+
+        // Register TransferService with typed HttpClient for keep-alive support
+        builder.Services.AddHttpClient<ITransferService, TransferService>()
+            .ConfigureHttpClient(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.ConnectionClose = false;
+            });
+
+        builder.Services.AddTransient<SettingsForm>();
         builder.Services.AddTransient<BrickPrinter>();
     }
 }

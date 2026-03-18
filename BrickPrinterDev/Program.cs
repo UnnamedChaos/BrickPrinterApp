@@ -19,8 +19,42 @@ app.UseHttpsRedirection();
 var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
 Directory.CreateDirectory(outputDir);
 
+// Lightweight keep-alive endpoint
+app.MapGet("/ping", () => Results.Text("ok"));
+
+// Status endpoint
+app.MapGet("/status", () => Results.Ok(new
+{
+    status = "ok",
+    numDisplays = 3,
+    screens = new[] {
+        new { id = 0, valid = true },
+        new { id = 1, valid = true },
+        new { id = 2, valid = true }
+    }
+}));
+
+// Clear endpoint
+app.MapPost("/clear", (HttpRequest request) =>
+{
+    if (request.Query.TryGetValue("screen", out var screenParam) && int.TryParse(screenParam, out var screenId))
+    {
+        Console.WriteLine($"Screen {screenId} cleared");
+        return Results.Ok(new { message = $"Display {screenId} cleared" });
+    }
+    Console.WriteLine("All screens cleared");
+    return Results.Ok(new { message = "All displays cleared" });
+});
+
 app.MapPost("/upload", async (HttpRequest request) =>
 {
+    // Get screen ID from query parameter (default to 0)
+    var screenId = 0;
+    if (request.Query.TryGetValue("screen", out var screenParam) && int.TryParse(screenParam, out var parsedId))
+    {
+        screenId = parsedId;
+    }
+
     using var ms = new MemoryStream();
     await request.Body.CopyToAsync(ms);
     var binaryData = ms.ToArray();
@@ -33,24 +67,17 @@ app.MapPost("/upload", async (HttpRequest request) =>
     // Convert binary data back to image
     var bitmap = ConvertBinaryToImage(binaryData);
 
-    // Save to output folder with timestamp
-    var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-
-    // Speichere Original (128x64)
-    var filename = Path.Combine(outputDir, $"screen.png");
+    // Save to output folder with screen ID
+    var filename = Path.Combine(outputDir, $"screen_{screenId}.png");
     bitmap.Save(filename, ImageFormat.Png);
 
-    // Speichere vergrößerte Version (4x Scale = 512x256) ohne Interpolation
-    //var scaledFilename = Path.Combine(outputDir, $"screen_{timestamp}_scaled.png");
-     //SaveScaledImage(bitmap, scaledFilename, 4);
-
-    // Speichere als Text-Datei (ASCII-Art)
-    var textFilename = Path.Combine(outputDir, $"screen.txt");
+    // Save as text file (ASCII-Art)
+    var textFilename = Path.Combine(outputDir, $"screen_{screenId}.txt");
     SaveAsTextFile(binaryData, textFilename);
 
-    Console.WriteLine($"Saved image to {filename}");
-    Console.WriteLine($"Saved text file to {textFilename}");
-    return Results.Ok(new { message = "Image saved", filename, textFilename });
+    Console.WriteLine($"Screen {screenId}: Saved image to {filename}");
+    Console.WriteLine($"Screen {screenId}: Saved text file to {textFilename}");
+    return Results.Ok(new { message = "Image saved", screen = screenId, filename, textFilename });
 });
 
 app.Run();

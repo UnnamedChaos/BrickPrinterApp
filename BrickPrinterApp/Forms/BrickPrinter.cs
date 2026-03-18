@@ -12,19 +12,16 @@ public partial class BrickPrinter : Form
     private readonly Image _image;
     private readonly ITransferService _transferService;
     private readonly ITextService _textService;
-    private readonly IWotDisplayService _wotDisplayService;
     private Timer? _minuteTimer;
     private NotifyIcon? _trayIcon;
     private ContextMenuStrip? _trayMenu;
-    private readonly IWotService _wotService;
 
-    public BrickPrinter(IDisplayService displayService, ITransferService transferService, ITextService textService, IWotService wotService, IWotDisplayService wotDisplayService, IHost host)
+    public BrickPrinter(IDisplayService displayService, ITransferService transferService, ITextService textService, IHost host)
     {
         InitializeComponent();
         _image = Image.FromFile("Resources/img.PNG");
         RegisterTrayIcon();
         RegisterTimer();
-
 
         // Fenster beim Start sofort verstecken
         WindowState = FormWindowState.Minimized;
@@ -33,20 +30,19 @@ public partial class BrickPrinter : Form
         _displayService = displayService;
         _transferService = transferService;
         _textService = textService;
-        _wotService = wotService;
-        _wotDisplayService = wotDisplayService;
         _host = host;
+
+        // Start keep-alive to maintain connection (ping every 15 seconds)
+        _transferService.StartKeepAlive(TimeSpan.FromSeconds(15));
     }
 
     private void RegisterTrayIcon()
     {
         // 1. Das Tray-Menü erstellen (Rechtsklick-Optionen)
         _trayMenu = new ContextMenuStrip();
-        _trayMenu.Items.Add("Jetzt Updaten", null, SendUpdate());
+        _trayMenu.Items.Add("Jetzt Updaten", null, SendSampleText());
         _trayMenu.Items.Add("Text Senden", null, SendSampleText());
-        _trayMenu.Items.Add("WoT Display", null, SendWotDisplay());
         _trayMenu.Items.Add("-"); // Trennlinie
-        _trayMenu.Items.Add("Load Data", null, LoadData());
         _trayMenu.Items.Add("Einstellungen", null, OpenSettings());
         _trayMenu.Items.Add("Beenden", null, (_, _) => Application.Exit());
 
@@ -68,23 +64,6 @@ public partial class BrickPrinter : Form
             // Wir holen uns eine frische Instanz des SettingsForm
             var settingsForm = _host.Services.GetRequiredService<SettingsForm>();
             settingsForm.ShowDialog(); // Öffnet es als Modal-Fenster
-        };
-    }
-    
-    private EventHandler? LoadData()
-    {
-        return (s, e) =>
-        {
-            _wotService.GetPlayerSessionsAsync("504774168");
-        };
-    }
-
-    private EventHandler? SendUpdate()
-    {
-        return async (_, _) =>
-        {
-            var binaryData = await _wotDisplayService.CreateDisplayDataAsync("504774168");
-            await _transferService.SendBinaryDataAsync(binaryData);
         };
     }
 
@@ -109,22 +88,6 @@ public partial class BrickPrinter : Form
         };
     }
 
-    private EventHandler? SendWotDisplay()
-    {
-        return async (_, _) =>
-        {
-            try
-            {
-                var binaryData = await _wotDisplayService.CreateDisplayDataAsync("504774168");
-                await _transferService.SendBinaryDataAsync(binaryData);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Fehler beim Laden der WoT-Daten: {ex.Message}", "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        };
-    }
-
     private void RegisterTimer()
     {
         // 3. Den Timer für jede Minute starten
@@ -143,5 +106,11 @@ public partial class BrickPrinter : Form
     {
         base.OnLoad(e);
         Hide();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        _transferService.StopKeepAlive();
+        base.OnFormClosing(e);
     }
 }

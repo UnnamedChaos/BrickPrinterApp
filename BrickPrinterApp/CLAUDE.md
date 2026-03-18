@@ -91,8 +91,6 @@ The application uses Microsoft.Extensions.Hosting for DI configuration (Program.
 ### Image Requirements
 
 - Images must be exactly 128x64 pixels (enforced in DisplayService.cs:13)
-- Source image: `Resources/img.PNG`
-- Icon: `Resources/brick.ico`
 
 ## Target Framework
 
