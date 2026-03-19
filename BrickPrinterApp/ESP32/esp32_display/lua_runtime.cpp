@@ -3,10 +3,8 @@
 #include <time.h>
 #include <LuaWrapper.h>
 
-// Single shared Lua instance to save memory
 static LuaWrapper* sharedLua = nullptr;
 
-// Script state per screen (no Lua instance per screen)
 struct LuaScreen {
     String script;
     bool active;
@@ -17,9 +15,8 @@ struct LuaScreen {
 static LuaScreen screens[NUM_DISPLAYS];
 static char lastError[128] = "";
 static uint8_t currentScreen = 0;
-static volatile bool luaVMBusy = false;  // Prevent race between webserver and main loop
+static volatile bool luaVMBusy = false;
 
-// Lua bindings - flat function names since we can't create tables
 static int lua_display_clear(lua_State* L) {
     displayClearBuffer(currentScreen);
     return 0;
@@ -80,44 +77,42 @@ static int lua_display_show(lua_State* L) {
     return 0;
 }
 
-// Time functions
-static int lua_time_hour(lua_State* L) {
+static struct tm* getTime() {
     time_t now = time(nullptr);
-    struct tm* tm = localtime(&now);
-    lua_pushinteger(L, tm ? tm->tm_hour : 0);
+    return localtime(&now);
+}
+
+static int lua_time_hour(lua_State* L) {
+    struct tm* t = getTime();
+    lua_pushinteger(L, t ? t->tm_hour : 0);
     return 1;
 }
 
 static int lua_time_minute(lua_State* L) {
-    time_t now = time(nullptr);
-    struct tm* tm = localtime(&now);
-    lua_pushinteger(L, tm ? tm->tm_min : 0);
+    struct tm* t = getTime();
+    lua_pushinteger(L, t ? t->tm_min : 0);
     return 1;
 }
 
 static int lua_time_second(lua_State* L) {
-    time_t now = time(nullptr);
-    struct tm* tm = localtime(&now);
-    lua_pushinteger(L, tm ? tm->tm_sec : 0);
+    struct tm* t = getTime();
+    lua_pushinteger(L, t ? t->tm_sec : 0);
     return 1;
 }
 
 static int lua_time_date(lua_State* L) {
-    time_t now = time(nullptr);
-    struct tm* tm = localtime(&now);
-    if (tm) {
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%02d.%02d.%04d",
-                 tm->tm_mday, tm->tm_mon + 1, tm->tm_year + 1900);
+    struct tm* t = getTime();
+    if (t) {
+        char buf[12];
+        snprintf(buf, sizeof(buf), "%02d.%02d.%04d", t->tm_mday, t->tm_mon + 1, t->tm_year + 1900);
         lua_pushstring(L, buf);
     } else {
-        lua_pushstring(L, "00.00.0000");
+        lua_pushstring(L, "");
     }
     return 1;
 }
 
 static void registerCustomFunctions(LuaWrapper* lua) {
-    // Display functions
     lua->Lua_register("clear", lua_display_clear);
     lua->Lua_register("text", lua_display_text);
     lua->Lua_register("setFont", lua_display_setFont);
@@ -126,8 +121,6 @@ static void registerCustomFunctions(LuaWrapper* lua) {
     lua->Lua_register("line", lua_display_line);
     lua->Lua_register("circle", lua_display_circle);
     lua->Lua_register("show", lua_display_show);
-
-    // Time functions
     lua->Lua_register("hour", lua_time_hour);
     lua->Lua_register("minute", lua_time_minute);
     lua->Lua_register("second", lua_time_second);
@@ -135,22 +128,16 @@ static void registerCustomFunctions(LuaWrapper* lua) {
 }
 
 static void destroyLua() {
-    if (sharedLua != nullptr) {
+    if (sharedLua) {
         delete sharedLua;
         sharedLua = nullptr;
-        Serial.println("Lua VM destroyed");
     }
 }
 
 static bool createLua() {
     sharedLua = new LuaWrapper();
-    if (!sharedLua) {
-        snprintf(lastError, sizeof(lastError), "Failed to create Lua instance");
-        return false;
-    }
-
+    if (!sharedLua) return false;
     registerCustomFunctions(sharedLua);
-    Serial.printf("Lua VM created (free heap: %d)\n", ESP.getFreeHeap());
     return true;
 }
 
@@ -170,55 +157,37 @@ void luaInit() {
         screens[i].lastRun = 0;
         screens[i].interval = 1000;
     }
-    Serial.println("Lua runtime initialized");
 }
 
 bool luaLoadScript(uint8_t screenId, const char* script) {
-    if (screenId >= NUM_DISPLAYS) {
-        snprintf(lastError, sizeof(lastError), "Invalid screen ID: %d", screenId);
-        return false;
-    }
+    if (screenId >= NUM_DISPLAYS) return false;
 
-    // Block luaTick() while we modify the VM
     luaVMBusy = true;
-
-    // Small delay to let any in-progress luaTick() complete
     delay(20);
 
-    // Mark this screen as inactive (we'll reactivate after loading)
     screens[screenId].script = "";
     screens[screenId].active = false;
     displayClear(screenId);
 
-    // Force recreate Lua VM to prevent memory accumulation
-    // All scripts are re-executed from their stored strings each tick,
-    // so we don't lose anything by starting fresh
     if (!ensureLuaInitialized(true)) {
         luaVMBusy = false;
         return false;
     }
 
-    // Re-run any other active scripts so they're in the fresh VM
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
         if (i != screenId && screens[i].active && screens[i].script.length() > 0) {
             currentScreen = i;
             sharedLua->Lua_dostring(&screens[i].script);
-            yield();  // Prevent watchdog timeout
+            yield();
         }
     }
 
-    // Store script
     screens[screenId].script = String(script);
-
-    // Run script once
     currentScreen = screenId;
     String result = sharedLua->Lua_dostring(&screens[screenId].script);
 
-    Serial.printf("Lua dostring result: '%s'\n", result.c_str());
-
     if (result.length() > 0 && result != "OK") {
-        snprintf(lastError, sizeof(lastError), "Lua error: %.100s", result.c_str());
-        Serial.printf("Lua error on screen %d: %s\n", screenId, lastError);
+        snprintf(lastError, sizeof(lastError), "%.120s", result.c_str());
         screens[screenId].script = "";
         luaVMBusy = false;
         return false;
@@ -226,9 +195,7 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
 
     screens[screenId].active = true;
     screens[screenId].lastRun = millis();
-
     luaVMBusy = false;
-    Serial.printf("Lua script loaded on screen %d\n", screenId);
     return true;
 }
 
@@ -239,26 +206,16 @@ void luaStopScript(uint8_t screenId, bool clearDisplay) {
     screens[screenId].script = "";
     screens[screenId].active = false;
 
-    if (clearDisplay) {
-        displayClear(screenId);
-    }
+    if (clearDisplay) displayClear(screenId);
 
     if (wasActive) {
-        Serial.printf("Lua script stopped on screen %d%s\n", screenId, clearDisplay ? " (display cleared)" : "");
-
-        // Check if all scripts are now inactive
         bool anyActive = false;
         for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
-            if (screens[i].active) {
-                anyActive = true;
-                break;
-            }
+            if (screens[i].active) { anyActive = true; break; }
         }
-
-        // If no scripts are running, destroy the Lua VM to free memory
         if (!anyActive) {
             luaVMBusy = true;
-            delay(20);  // Let any in-progress luaTick() complete
+            delay(20);
             destroyLua();
             luaVMBusy = false;
         }
@@ -274,22 +231,12 @@ void luaTick() {
     if (luaVMBusy || !sharedLua) return;
 
     unsigned long now = millis();
-
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
-        if (!screens[i].active) continue;
-
-        if (now - screens[i].lastRun < screens[i].interval) continue;
-
+        if (!screens[i].active || now - screens[i].lastRun < screens[i].interval) continue;
         screens[i].lastRun = now;
         currentScreen = i;
-
-        // Re-run the script
-        String result = sharedLua->Lua_dostring(&screens[i].script);
-        if (result.length() > 0 && result != "OK") {
-            Serial.printf("Lua tick error on screen %d: '%s'\n", i, result.c_str());
-        }
-
-        yield();  // Prevent watchdog timeout between scripts
+        sharedLua->Lua_dostring(&screens[i].script);
+        yield();
     }
 }
 

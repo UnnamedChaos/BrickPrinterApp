@@ -33,7 +33,7 @@ public partial class BrickPrinter : Form
         ShowInTaskbar = false;
 
         // Start keep-alive to maintain connection (ping every 15 seconds)
-        _transferService.StartKeepAlive(TimeSpan.FromSeconds(60));
+        _transferService.StartKeepAlive(TimeSpan.FromSeconds(10));
 
         // Start recovery listener for ESP32 widget re-initialization requests
         _recoveryListener.Start();
