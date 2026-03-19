@@ -47,6 +47,7 @@ public partial class BrickPrinter : Form
         _trayMenu.Items.Add("-");
         _trayMenu.Items.Add(CreateScreenSelectionMenu());
         _trayMenu.Items.Add("Einstellungen", null, OpenSettings());
+        _trayMenu.Items.Add("WiFi Setup", null, OpenWiFiSetup());
         _trayMenu.Items.Add("Beenden", null, (_, _) => Application.Exit());
 
         _trayIcon = new NotifyIcon();
@@ -98,6 +99,15 @@ public partial class BrickPrinter : Form
         {
             var settingsForm = _host.Services.GetRequiredService<SettingsForm>();
             settingsForm.ShowDialog();
+        };
+    }
+
+    private EventHandler OpenWiFiSetup()
+    {
+        return (_, _) =>
+        {
+            var wifiForm = _host.Services.GetRequiredService<WiFiSetupForm>();
+            wifiForm.ShowDialog();
         };
     }
 

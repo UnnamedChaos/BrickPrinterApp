@@ -25,8 +25,8 @@ static volatile bool screenHasContent[NUM_DISPLAYS] = {false, false, false};
 
 // Recovery state
 static volatile unsigned long lastRecoveryAttempt[NUM_DISPLAYS] = {0, 0, 0};
-static const unsigned long RECOVERY_COOLDOWN_MS = 10000;  // 10 seconds between recovery attempts
-static const unsigned long SCREEN_IDLE_THRESHOLD_MS = 5000;  // 5 seconds of no content before recovery
+static const unsigned long RECOVERY_COOLDOWN_MS = 30000;  // 30 seconds between recovery attempts
+static const unsigned long SCREEN_IDLE_THRESHOLD_MS = 10000;  // 10 seconds of no content before recovery
 
 // Temporary buffer for receiving data
 static uint8_t tempBuffer[DISPLAY_BUFFER_SIZE];
@@ -403,52 +403,40 @@ bool serverScreenHasContent(uint8_t screenId) {
 }
 
 bool serverRequestRecovery(uint8_t screenId) {
-    if (!hasServerIP) {
-        Serial.println("Recovery: No server IP saved");
-        return false;
-    }
-
-    if (screenId >= NUM_DISPLAYS) {
-        Serial.println("Recovery: Invalid screen ID");
+    if (!hasServerIP || screenId >= NUM_DISPLAYS) {
         return false;
     }
 
     // Check cooldown
     unsigned long now = millis();
     if (now - lastRecoveryAttempt[screenId] < RECOVERY_COOLDOWN_MS) {
-        return false;  // Silent fail, still in cooldown
+        return false;
     }
     lastRecoveryAttempt[screenId] = now;
 
-    Serial.printf("Recovery: Requesting widget for screen %d from %s\n", screenId, serverIP.c_str());
+    Serial.printf("Recovery: Requesting screen %d\n", screenId);
 
     HTTPClient http;
     String url = "http://" + serverIP + ":5225/recovery?screen=" + String(screenId);
 
     http.begin(url);
-    http.setTimeout(5000);  // 5 second timeout
+    http.setTimeout(1000);  // Short timeout to avoid watchdog
 
     int httpCode = http.GET();
-
-    if (httpCode > 0) {
-        Serial.printf("Recovery: Response code %d\n", httpCode);
-        if (httpCode == HTTP_CODE_OK) {
-            String response = http.getString();
-            Serial.printf("Recovery: %s\n", response.c_str());
-            http.end();
-            return true;
-        }
-    } else {
-        Serial.printf("Recovery: Request failed, error: %s\n", http.errorToString(httpCode).c_str());
-    }
-
     http.end();
-    return false;
+
+    yield();  // Feed watchdog
+
+    return (httpCode == HTTP_CODE_OK);
 }
 
 void serverRequestRecoveryForEmptyScreens() {
     // Only try recovery if we have server IP and first contact was made
     if (!hasServerIP || !firstContactEstablished) return;
+
+    // Don't attempt recovery if we received contact very recently (avoid conflicts)
+    unsigned long contactAge = serverGetLastContactAge();
+    if (contactAge < 5000) return;  // Wait at least 5 seconds after last contact
 
     unsigned long now = millis();
 

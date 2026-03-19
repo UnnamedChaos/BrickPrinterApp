@@ -10,7 +10,8 @@
  * - Shows IP address on all displays until first contact
  * - Keep-alive support for fast subsequent transfers
  * - WiFi credentials configurable via USB serial
- * - OTA (Over-The-Air) firmware updates via WiFi
+ * - Lua scripting for dynamic widgets
+ * - OTA firmware updates via WiFi
  *
  * Wiring:
  * - Display 0: SDA=6, SCL=7
@@ -24,10 +25,6 @@
  * - CLEAR               - Clear stored config
  * - REBOOT              - Restart ESP32
  * - HELP                - Show help
- *
- * OTA Update:
- * - Arduino IDE: Tools -> Port -> select network port (ESP32_Display)
- * - PlatformIO: pio run -t upload --upload-port <IP>
  */
 
 #include <WiFi.h>
@@ -45,7 +42,7 @@
 
 // OTA settings
 #define OTA_HOSTNAME "ESP32_Display"
-#define OTA_PASSWORD "brick123"  // Change this or remove for no password
+#define OTA_PASSWORD "brick123"
 
 // State tracking
 bool showingIPScreen = true;
@@ -154,8 +151,7 @@ void setup() {
     serverInit();
 
     Serial.println("Ready. Type HELP for serial commands.");
-    Serial.println("OTA enabled - upload via network port in Arduino IDE");
-    Serial.println("Lua scripting enabled via POST /lua?screen=X");
+    Serial.println("OTA enabled - upload via network port");
 }
 
 void setupOTA() {
@@ -163,54 +159,21 @@ void setupOTA() {
     ArduinoOTA.setPassword(OTA_PASSWORD);
 
     ArduinoOTA.onStart([]() {
-        String type = (ArduinoOTA.getCommand() == U_FLASH) ? "firmware" : "filesystem";
-        Serial.println("OTA Start: " + type);
-        displayShowMessageAll(
-            "OTA Update",
-            "",
-            "Uploading...",
-            "",
-            "DO NOT POWER OFF"
-        );
+        Serial.println("OTA Start");
+        displayShowMessageAll("OTA Update", "", "Uploading...");
     });
 
     ArduinoOTA.onEnd([]() {
-        Serial.println("\nOTA End - Rebooting...");
-        displayShowMessageAll(
-            "OTA Update",
-            "",
-            "Complete!",
-            "",
-            "Rebooting..."
-        );
+        Serial.println("\nOTA End");
+        displayShowMessageAll("OTA Complete", "", "Rebooting...");
     });
 
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        static uint8_t lastPercent = 0;
-        uint8_t percent = (progress / (total / 100));
-        if (percent != lastPercent) {
-            lastPercent = percent;
-            Serial.printf("OTA Progress: %u%%\r", percent);
-
-            // Update display every 10%
-            if (percent % 10 == 0) {
-                char progressStr[20];
-                sprintf(progressStr, "Progress: %d%%", percent);
-                displayShowMessage(0, "OTA Update", "", progressStr, "", "DO NOT POWER OFF");
-            }
-        }
+        Serial.printf("OTA: %u%%\r", (progress / (total / 100)));
     });
 
     ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("OTA Error[%u]: ", error);
-        const char* errorMsg = "Unknown error";
-        if (error == OTA_AUTH_ERROR) errorMsg = "Auth Failed";
-        else if (error == OTA_BEGIN_ERROR) errorMsg = "Begin Failed";
-        else if (error == OTA_CONNECT_ERROR) errorMsg = "Connect Failed";
-        else if (error == OTA_RECEIVE_ERROR) errorMsg = "Receive Failed";
-        else if (error == OTA_END_ERROR) errorMsg = "End Failed";
-        Serial.println(errorMsg);
-        displayShowMessageAll("OTA Error", "", errorMsg);
+        Serial.printf("OTA Error[%u]\n", error);
     });
 
     ArduinoOTA.begin();
@@ -218,10 +181,9 @@ void setupOTA() {
 }
 
 void loop() {
-    // Handle OTA updates (must be called frequently)
     ArduinoOTA.handle();
 
-    // Process serial commands (works even while running)
+    // Process serial commands
     configProcessSerial();
 
     // Handle new display data for each screen
@@ -253,5 +215,7 @@ void loop() {
         serverRequestRecoveryForEmptyScreens();
     }
 
+    // Yield to prevent watchdog timeout
+    yield();
     delay(10);
 }

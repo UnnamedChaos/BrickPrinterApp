@@ -132,6 +132,7 @@ public class TransferService : ITransferService, IDisposable
                     using var content = new FormUrlEncodedContent(formData);
 
                     var url = _settings.GetScriptUrl(screenId);
+                    Console.WriteLine("Sending script to " + url);
                     var response = await _httpClient.PostAsync(url, content);
                     return response.IsSuccessStatusCode;
                 });

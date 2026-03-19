@@ -1,3 +1,4 @@
+using System.Net.Http;
 using BrickPrinterApp.Forms;
 using BrickPrinterApp.Interfaces;
 using BrickPrinterApp.Services;
@@ -26,6 +27,7 @@ internal static class Program
         var displayService = host.Services.GetRequiredService<IDisplayService>();
         widgetService.RegisterWidget(new SampleTextWidget(textService));
         widgetService.RegisterWidget(new LogoWidget(displayService));
+        widgetService.RegisterWidget(new WeatherWidget(displayService));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
 
@@ -42,15 +44,24 @@ internal static class Program
         builder.Services.AddSingleton<RecoveryListenerService>();
 
         // Register TransferService with typed HttpClient
-        // Disable keep-alive - ESP32 handles single connections better
+        // Configure handler to avoid stale connection issues with ESP32
         builder.Services.AddHttpClient<ITransferService, TransferService>()
             .ConfigureHttpClient(client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(10);
                 client.DefaultRequestHeaders.ConnectionClose = true;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                // Don't pool connections - ESP32 closes them unpredictably
+                PooledConnectionLifetime = TimeSpan.Zero,
+                PooledConnectionIdleTimeout = TimeSpan.FromSeconds(1),
+                // Faster connection timeout for embedded devices
+                ConnectTimeout = TimeSpan.FromSeconds(5),
             });
 
         builder.Services.AddTransient<SettingsForm>();
+        builder.Services.AddTransient<WiFiSetupForm>();
         builder.Services.AddTransient<WidgetManagerForm>();
         builder.Services.AddTransient<BrickPrinter>();
     }

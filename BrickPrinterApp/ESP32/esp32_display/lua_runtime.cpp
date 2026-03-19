@@ -203,6 +203,7 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
         if (i != screenId && screens[i].active && screens[i].script.length() > 0) {
             currentScreen = i;
             sharedLua->Lua_dostring(&screens[i].script);
+            yield();  // Prevent watchdog timeout
         }
     }
 
@@ -285,6 +286,8 @@ void luaTick() {
         if (result.length() > 0 && result != "OK") {
             Serial.printf("Lua tick error on screen %d: '%s'\n", i, result.c_str());
         }
+
+        yield();  // Prevent watchdog timeout between scripts
     }
 }
 

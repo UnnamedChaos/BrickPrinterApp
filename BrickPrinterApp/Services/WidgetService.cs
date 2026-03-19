@@ -65,16 +65,8 @@ public class WidgetService : IDisposable
             {
                 cts = new CancellationTokenSource();
                 _screenCts[screenId] = cts;
-            }
-        }
 
-        if (widget != null && cts != null)
-        {
-            // Run sequentially: stop script first, then send content
-            _ = StopScriptThenSendWidget(screenId, widget, cts.Token);
-
-            lock (_lock)
-            {
+                // Create timer inside the same lock to prevent race conditions
                 var timer = new Timer(
                     _ => SendWidgetContentIfNotCanceled(screenId, widget, cts.Token),
                     null,
@@ -83,6 +75,12 @@ public class WidgetService : IDisposable
 
                 _screenTimers[screenId] = timer;
             }
+        }
+
+        if (widget != null && cts != null)
+        {
+            // Run sequentially: stop script first, then send content
+            _ = StopScriptThenSendWidget(screenId, widget, cts.Token);
         }
         else
         {
