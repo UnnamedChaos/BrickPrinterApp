@@ -36,8 +36,9 @@
 #include "webserver.h"
 #include "config.h"
 
-// OTA hostname
+// OTA settings
 #define OTA_HOSTNAME "ESP32_Display"
+#define OTA_PASSWORD "brick123"  // Change this or remove for no password
 
 // State tracking
 bool showingIPScreen = true;
@@ -139,6 +140,7 @@ void setup() {
 
 void setupOTA() {
     ArduinoOTA.setHostname(OTA_HOSTNAME);
+    ArduinoOTA.setPassword(OTA_PASSWORD);
 
     ArduinoOTA.onStart([]() {
         String type = (ArduinoOTA.getCommand() == U_FLASH) ? "firmware" : "filesystem";

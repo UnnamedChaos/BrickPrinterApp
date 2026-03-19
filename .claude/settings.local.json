@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(dotnet build:*)",
-      "WebFetch(domain:api.tomato.gg)"
+      "WebFetch(domain:api.tomato.gg)",
+      "Bash(cmd.exe:*)"
     ]
   }
 }

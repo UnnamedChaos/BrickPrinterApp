@@ -1,6 +1,7 @@
 using BrickPrinterApp.Forms;
 using BrickPrinterApp.Interfaces;
 using BrickPrinterApp.Services;
+using BrickPrinterApp.Widgets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -18,6 +19,12 @@ internal static class Program
         var builder = Host.CreateApplicationBuilder();
         RegisterServices(builder);
         using var host = builder.Build();
+
+        // Register widgets
+        var widgetService = host.Services.GetRequiredService<WidgetService>();
+        var textService = host.Services.GetRequiredService<ITextService>();
+        widgetService.RegisterWidget(new SampleTextWidget(textService));
+
         var mainForm = host.Services.GetRequiredService<BrickPrinter>();
         Application.Run(mainForm);
     }
@@ -27,6 +34,7 @@ internal static class Program
         builder.Services.AddSingleton<SettingService>();
         builder.Services.AddSingleton<IDisplayService, DisplayService>();
         builder.Services.AddSingleton<ITextService, RawTextService>();
+        builder.Services.AddSingleton<WidgetService>();
 
         // Register TransferService with typed HttpClient for keep-alive support
         builder.Services.AddHttpClient<ITransferService, TransferService>()
@@ -37,6 +45,7 @@ internal static class Program
             });
 
         builder.Services.AddTransient<SettingsForm>();
+        builder.Services.AddTransient<WidgetManagerForm>();
         builder.Services.AddTransient<BrickPrinter>();
     }
 }

@@ -2,38 +2,33 @@ using BrickPrinterApp.Interfaces;
 using BrickPrinterApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Timer = System.Windows.Forms.Timer;
 
 namespace BrickPrinterApp.Forms;
 
 public partial class BrickPrinter : Form
 {
-    private readonly IDisplayService _displayService;
     private readonly IHost _host;
-    private readonly Image _image;
     private readonly ITransferService _transferService;
     private readonly ITextService _textService;
     private readonly SettingService _settings;
-    private Timer? _minuteTimer;
+    private readonly WidgetService _widgetService;
     private NotifyIcon? _trayIcon;
     private ContextMenuStrip? _trayMenu;
 
-    public BrickPrinter(IDisplayService displayService, ITransferService transferService, ITextService textService, SettingService settings, IHost host)
+    public BrickPrinter(ITransferService transferService, ITextService textService, SettingService settings, WidgetService widgetService, IHost host)
     {
+        _transferService = transferService;
+        _textService = textService;
+        _settings = settings;
+        _widgetService = widgetService;
+        _host = host;
+
         InitializeComponent();
-        _image = Image.FromFile("Resources/img.PNG");
         RegisterTrayIcon();
-        RegisterTimer();
 
         // Fenster beim Start sofort verstecken
         WindowState = FormWindowState.Minimized;
         ShowInTaskbar = false;
-
-        _displayService = displayService;
-        _transferService = transferService;
-        _textService = textService;
-        _settings = settings;
-        _host = host;
 
         // Start keep-alive to maintain connection (ping every 15 seconds)
         _transferService.StartKeepAlive(TimeSpan.FromSeconds(15));
@@ -41,47 +36,75 @@ public partial class BrickPrinter : Form
 
     private void RegisterTrayIcon()
     {
-        // 1. Das Tray-Menü erstellen (Rechtsklick-Optionen)
         _trayMenu = new ContextMenuStrip();
-        _trayMenu.Items.Add("Jetzt Updaten", null, SendSampleText());
-        _trayMenu.Items.Add("Text Senden", null, SendSampleText());
-        _trayMenu.Items.Add("-"); // Trennlinie
+        _trayMenu.Items.Add("Widget Manager", null, OpenWidgetManager());
+        _trayMenu.Items.Add("Test Senden", null, SendSampleText());
+        _trayMenu.Items.Add("-");
+        _trayMenu.Items.Add(CreateScreenSelectionMenu());
         _trayMenu.Items.Add("Einstellungen", null, OpenSettings());
         _trayMenu.Items.Add("Beenden", null, (_, _) => Application.Exit());
 
-        // 2. Das Tray-Icon selbst erstellen
         _trayIcon = new NotifyIcon();
         _trayIcon.Text = "BrickPrinter";
-
-        // WICHTIG: Du brauchst eine .ico Datei im Ordner oder nutzt ein System-Icon:
         _trayIcon.Icon = new Icon("Resources/brick.ico");
-
         _trayIcon.ContextMenuStrip = _trayMenu;
         _trayIcon.Visible = true;
     }
 
-    private EventHandler? OpenSettings()
+    private ToolStripMenuItem CreateScreenSelectionMenu()
     {
-        return (s, e) =>
+        var screenMenu = new ToolStripMenuItem("Bildschirm");
+
+        for (int i = 0; i < SettingService.NumScreens; i++)
         {
-            // Wir holen uns eine frische Instanz des SettingsForm
-            var settingsForm = _host.Services.GetRequiredService<SettingsForm>();
-            settingsForm.ShowDialog(); // Öffnet es als Modal-Fenster
+            var screenIndex = i;
+            var item = new ToolStripMenuItem($"Screen {i}")
+            {
+                Checked = _settings.SelectedScreen == i
+            };
+            item.Click += (_, _) =>
+            {
+                foreach (ToolStripMenuItem menuItem in screenMenu.DropDownItems)
+                {
+                    menuItem.Checked = false;
+                }
+                item.Checked = true;
+                _settings.SelectedScreen = screenIndex;
+                _settings.Save();
+            };
+            screenMenu.DropDownItems.Add(item);
+        }
+
+        return screenMenu;
+    }
+
+    private EventHandler OpenWidgetManager()
+    {
+        return (_, _) =>
+        {
+            var form = _host.Services.GetRequiredService<WidgetManagerForm>();
+            form.ShowDialog();
         };
     }
 
-    private EventHandler? SendSampleText()
+    private EventHandler OpenSettings()
+    {
+        return (_, _) =>
+        {
+            var settingsForm = _host.Services.GetRequiredService<SettingsForm>();
+            settingsForm.ShowDialog();
+        };
+    }
+
+    private EventHandler SendSampleText()
     {
         return async (_, _) =>
         {
             var sampleLines = new[]
             {
                 "BrickPrinter",
-                "============",
-                "",
                 "Status: OK",
                 $"Zeit: {DateTime.Now:HH:mm:ss}",
-                $"Datum: {DateTime.Now:dd.MM.yyyy}",
                 $"Screen: {_settings.SelectedScreen}",
             };
 
@@ -89,20 +112,6 @@ public partial class BrickPrinter : Form
             await _transferService.SendBinaryDataAsync(binaryData, _settings.SelectedScreen);
         };
     }
-
-    private void RegisterTimer()
-    {
-        // 3. Den Timer für jede Minute starten
-        _minuteTimer = new Timer();
-        _minuteTimer.Interval = 60000; // 60.000 ms = 1 Minute
-        _minuteTimer.Tick += async (s, e) =>
-        {
-            var binaryData = _displayService.ConvertImageToBinary(_image);
-            //await _transferService.SendBinaryDataAsync(binaryData, _settings.SelectedScreen);
-        };
-        _minuteTimer.Start();
-    }
-
 
     protected override void OnLoad(EventArgs e)
     {
@@ -113,6 +122,7 @@ public partial class BrickPrinter : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _transferService.StopKeepAlive();
+        _widgetService.Dispose();
         base.OnFormClosing(e);
     }
 }

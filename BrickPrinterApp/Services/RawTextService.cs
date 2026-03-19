@@ -9,15 +9,19 @@ public class RawTextService : ITextService
 {
     private readonly Buffer1bpp _buffer;
     private readonly MicroGraphics _graphics;
-    private int _lineHeight = 8;
+    private readonly int _height;
+    private readonly int _width;
+    private readonly object _lock = new();
 
     public RawTextService()
     {
-        _buffer = new Buffer1bpp(128, 64);
-        
+        _height = 64;
+        _width = 128;
+        _buffer = new Buffer1bpp(_width, _height);
+
         // Wir erstellen einen Simulator, der das IPixelDisplay Interface erfüllt
         var displaySimulator = new DisplayBufferSimulator(_buffer);
-        
+
         _graphics = new MicroGraphics(displaySimulator)
         {
             CurrentFont = new Font4x8()
@@ -26,16 +30,35 @@ public class RawTextService : ITextService
 
     public byte[] ConvertTextToBinary(string[] lines)
     {
-        _graphics.Clear(true); // true = leeren
-
-        for (int i = 0; i < lines.Length; i++)
+        lock (_lock)
         {
-            _graphics.DrawText(1, i * _lineHeight + 1, lines[i], Color.White);
+            _buffer.Clear();
+            _graphics.Clear(true);
+
+            // Adjust font based on line count
+            var (font, lineHeight) = lines.Length switch
+            {
+                <= 3 => ((IFont)new Font12x20(), 20),
+                4 => (new Font12x16(), 16),
+                5 => (new Font8x12(), 12),
+                <= 8 => (new Font6x8(), 8),
+                _ => (new Font4x6(), 6)
+            };
+
+            _graphics.CurrentFont = font;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                _graphics.DrawText(1, i * lineHeight, lines[i], Color.White);
+            }
+
+            _graphics.Show();
+
+            // Return a copy to avoid reference issues
+            var result = new byte[_buffer.Buffer.Length];
+            Array.Copy(_buffer.Buffer, result, result.Length);
+            return result;
         }
-
-        _graphics.Show();
-
-        return _buffer.Buffer;
     }
 }
 

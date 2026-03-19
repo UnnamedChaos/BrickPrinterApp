@@ -18,12 +18,17 @@ static const uint8_t sclPins[NUM_DISPLAYS] = {SCL_PIN_0, SCL_PIN_1, SCL_PIN_2};
 // Track which displays initialized successfully
 static bool displayInitialized[NUM_DISPLAYS] = {false, false, false};
 
-// Switch I2C pins (your working pattern)
+// Screen 0 uses strapping pins (GPIO 2/3) - needs special handling
+static bool isStrappingPinScreen(uint8_t screenId) {
+    return (sdaPins[screenId] == 2 || sdaPins[screenId] == 3 ||
+            sclPins[screenId] == 2 || sclPins[screenId] == 3);
+}
+
+// Switch I2C pins
 static void switchBus(uint8_t screenId) {
     Wire.end();
-    delay(screenId == 2 ? 5 : 1);  // Screen 2 needs longer delay (strapping pins)
-    Wire.begin(sdaPins[screenId], sclPins[screenId]);
     delay(1);
+    Wire.begin(sdaPins[screenId], sclPins[screenId]);
 }
 
 bool displayIsValidScreen(uint8_t screenId) {
@@ -59,6 +64,11 @@ void displayShowMessage(uint8_t screenId, const char* line1, const char* line2,
 
     switchBus(screenId);
 
+    // Re-init strapping pin screens to ensure clean state
+    if (isStrappingPinScreen(screenId)) {
+        displays[screenId]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+    }
+
     displays[screenId]->clearDisplay();
     displays[screenId]->setCursor(0, 0);
 
@@ -86,6 +96,11 @@ void displayShowIP(const char* ip) {
 
         switchBus(i);
 
+        // Re-init strapping pin screens to ensure clean state
+        if (isStrappingPinScreen(i)) {
+            displays[i]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+        }
+
         displays[i]->clearDisplay();
         displays[i]->setCursor(0, 0);
         displays[i]->print("Screen ");
@@ -106,6 +121,11 @@ void displayUpdate(uint8_t screenId, const uint8_t* buffer) {
     }
 
     switchBus(screenId);
+
+    // Re-init strapping pin screens to ensure clean state
+    if (isStrappingPinScreen(screenId)) {
+        displays[screenId]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+    }
 
     displays[screenId]->clearDisplay();
 
@@ -142,4 +162,34 @@ void displayClearAll() {
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
         displayClear(i);
     }
+}
+
+bool displayCheckScreen(uint8_t screenId) {
+    if (screenId >= NUM_DISPLAYS) return false;
+
+    switchBus(screenId);
+
+    // Try to communicate with the display via I2C
+    Wire.beginTransmission(SCREEN_ADDRESS);
+    uint8_t error = Wire.endTransmission();
+
+    // Re-initialize display after raw I2C check to restore state
+    if (error == 0 && displayInitialized[screenId]) {
+        displays[screenId]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+    }
+
+    // 0 = success, other = error
+    return (error == 0);
+}
+
+uint8_t displayCheckAllScreens() {
+    uint8_t result = 0;
+
+    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        if (displayCheckScreen(i)) {
+            result |= (1 << i);
+        }
+    }
+
+    return result;
 }

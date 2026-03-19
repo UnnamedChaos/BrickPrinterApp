@@ -141,6 +141,9 @@ static void handleStatus(AsyncWebServerRequest *request) {
     unsigned long uptime = millis() / 1000;
     unsigned long lastContact = (lastContactTime > 0) ? (millis() - lastContactTime) / 1000 : 0;
 
+    // Check all screens (I2C ping)
+    uint8_t screenStatus = displayCheckAllScreens();
+
     String json = "{";
     json += "\"status\":\"ok\",";
     json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
@@ -151,9 +154,13 @@ static void handleStatus(AsyncWebServerRequest *request) {
     json += "\"screens\":[";
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
         if (i > 0) json += ",";
-        json += "{\"id\":" + String(i) + ",\"valid\":" + String(displayIsValidScreen(i) ? "true" : "false") + "}";
+        bool responding = (screenStatus & (1 << i)) != 0;
+        json += "{\"id\":" + String(i);
+        json += ",\"initialized\":" + String(displayIsValidScreen(i) ? "true" : "false");
+        json += ",\"responding\":" + String(responding ? "true" : "false") + "}";
     }
     json += "],";
+    json += "\"allScreensOk\":" + String(screenStatus == 0x07 ? "true" : "false") + ",";
     json += "\"connected\":" + String(firstContactEstablished ? "true" : "false") + ",";
     json += "\"lastContactSec\":" + String(lastContact);
     json += "}";

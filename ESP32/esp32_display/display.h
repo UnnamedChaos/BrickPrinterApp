@@ -13,14 +13,14 @@
 #define NUM_DISPLAYS 3
 
 // I2C pins for each display
-#define SDA_PIN_0 6
-#define SCL_PIN_0 7
+#define SDA_PIN_0 10
+#define SCL_PIN_0 21
 
 #define SDA_PIN_1 4
 #define SCL_PIN_1 5
 
-#define SDA_PIN_2 2
-#define SCL_PIN_2 3
+#define SDA_PIN_2 8
+#define SCL_PIN_2 9
 
 // Buffer size
 #define DISPLAY_BUFFER_SIZE 1024
@@ -50,7 +50,13 @@ void displayClear(uint8_t screenId);
 // Clear all displays
 void displayClearAll();
 
-// Check if screen ID is valid
+// Check if screen ID is valid (was initialized)
 bool displayIsValidScreen(uint8_t screenId);
+
+// Check if screen is responding (I2C ping)
+bool displayCheckScreen(uint8_t screenId);
+
+// Check all screens and return bitmask (bit 0 = screen 0, etc.)
+uint8_t displayCheckAllScreens();
 
 #endif
