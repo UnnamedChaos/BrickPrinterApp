@@ -174,6 +174,12 @@ static void handleStatus(AsyncWebServerRequest *request) {
     unsigned long uptime = millis() / 1000;
     unsigned long lastContact = (lastContactTime > 0) ? (millis() - lastContactTime) / 1000 : 0;
 
+    // Get screen ID from parameter (default to 0 for backward compatibility)
+    uint8_t screenId = 0;
+    if (request->hasParam("screen")) {
+        screenId = request->getParam("screen")->value().toInt();
+    }
+
     // Check all screens (I2C ping)
     uint8_t screenStatus = displayCheckAllScreens();
 
@@ -184,13 +190,20 @@ static void handleStatus(AsyncWebServerRequest *request) {
     json += "\"freeHeap\":" + String(ESP.getFreeHeap()) + ",";
     json += "\"uptime\":" + String(uptime) + ",";
     json += "\"numDisplays\":" + String(NUM_DISPLAYS) + ",";
+
+    // Add script_running status for the requested screen
+    if (screenId < NUM_DISPLAYS) {
+        json += "\"script_running\":" + String(luaHasScript(screenId) ? "true" : "false") + ",";
+    }
+
     json += "\"screens\":[";
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
         if (i > 0) json += ",";
         bool responding = (screenStatus & (1 << i)) != 0;
         json += "{\"id\":" + String(i);
         json += ",\"initialized\":" + String(displayIsValidScreen(i) ? "true" : "false");
-        json += ",\"responding\":" + String(responding ? "true" : "false") + "}";
+        json += ",\"responding\":" + String(responding ? "true" : "false");
+        json += ",\"script_running\":" + String(luaHasScript(i) ? "true" : "false") + "}";
     }
     json += "],";
     json += "\"allScreensOk\":" + String(screenStatus == 0x07 ? "true" : "false") + ",";
@@ -246,8 +259,8 @@ static void handleUploadComplete(AsyncWebServerRequest *request) {
     serverIP = clientIP.toString();
     hasServerIP = true;
 
-    // Stop any running Lua script on this screen before updating with binary data
-    luaStopScript(pendingScreenId);
+    // Stop any running Lua script on this screen (without clearing - binary data will overwrite)
+    luaStopScript(pendingScreenId, false);
 
     // Copy temp buffer to display buffer for the target screen
     memcpy(displayBuffers[pendingScreenId], tempBuffer, DISPLAY_BUFFER_SIZE);

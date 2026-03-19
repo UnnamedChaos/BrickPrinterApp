@@ -232,17 +232,19 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
     return true;
 }
 
-void luaStopScript(uint8_t screenId) {
+void luaStopScript(uint8_t screenId, bool clearDisplay) {
     if (screenId >= NUM_DISPLAYS) return;
 
     bool wasActive = screens[screenId].active;
     screens[screenId].script = "";
     screens[screenId].active = false;
 
-    displayClear(screenId);
+    if (clearDisplay) {
+        displayClear(screenId);
+    }
 
     if (wasActive) {
-        Serial.printf("Lua script stopped on screen %d\n", screenId);
+        Serial.printf("Lua script stopped on screen %d%s\n", screenId, clearDisplay ? " (display cleared)" : "");
 
         // Check if all scripts are now inactive
         bool anyActive = false;

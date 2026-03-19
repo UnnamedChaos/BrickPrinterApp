@@ -20,6 +20,7 @@ public class SettingService
     public string GetEndpointUrl(int screenId) => $"http://{EspIpAddress}/upload?screen={screenId}";
     public string GetScriptUrl(int screenId) => $"http://{EspIpAddress}/lua?screen={screenId}";
     public string GetStopScriptUrl(int screenId) => $"http://{EspIpAddress}/lua/stop?screen={screenId}";
+    public string GetStatusUrl(int screenId) => $"http://{EspIpAddress}/status?screen={screenId}";
     
     public SettingService()
     {

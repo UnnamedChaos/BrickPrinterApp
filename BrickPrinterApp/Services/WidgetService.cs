@@ -65,22 +65,12 @@ public class WidgetService : IDisposable
             {
                 cts = new CancellationTokenSource();
                 _screenCts[screenId] = cts;
-
-                // Create timer inside the same lock to prevent race conditions
-                var timer = new Timer(
-                    _ => SendWidgetContentIfNotCanceled(screenId, widget, cts.Token),
-                    null,
-                    widget.UpdateInterval,
-                    widget.UpdateInterval);
-
-                _screenTimers[screenId] = timer;
             }
         }
 
         if (widget != null && cts != null)
         {
-            // Run sequentially: stop script first, then send content
-            _ = StopScriptThenSendWidget(screenId, widget, cts.Token);
+            _ = SendWidgetAndStartTimer(screenId, widget, cts);
         }
         else
         {
@@ -198,17 +188,39 @@ public class WidgetService : IDisposable
         }
     }
 
-    private async Task StopScriptThenSendWidget(int screenId, IWidget widget, CancellationToken ct)
+    private async Task SendWidgetAndStartTimer(int screenId, IWidget widget, CancellationTokenSource cts)
     {
         try
         {
-            // First stop any running script
-            await _transferService.StopScriptAsync(screenId);
+            // Check if a script is currently running on the ESP32
+            var scriptRunning = await _transferService.IsScriptRunningAsync(screenId);
 
-            if (ct.IsCancellationRequested) return;
+            if (scriptRunning)
+            {
+                await _transferService.StopScriptAsync(screenId);
+                if (cts.Token.IsCancellationRequested) return;
+            }
 
-            // Then send the widget content
-            await SendWidgetContent(screenId, widget, ct);
+            // Send the initial widget content
+            await SendWidgetContent(screenId, widget, cts.Token);
+
+            if (cts.Token.IsCancellationRequested) return;
+
+            // Start the timer after first content is sent
+            lock (_lock)
+            {
+                // Verify the widget and CTS haven't been replaced
+                if (_screenCts.GetValueOrDefault(screenId) == cts)
+                {
+                    var timer = new Timer(
+                        _ => SendWidgetContentIfNotCanceled(screenId, widget, cts.Token),
+                        null,
+                        widget.UpdateInterval,
+                        widget.UpdateInterval);
+
+                    _screenTimers[screenId] = timer;
+                }
+            }
         }
         catch
         {

@@ -12,7 +12,8 @@ void luaInit();
 bool luaLoadScript(uint8_t screenId, const char* script);
 
 // Stop script execution for a specific screen
-void luaStopScript(uint8_t screenId);
+// clearDisplay: if true, clears the display after stopping (default: true for backward compatibility)
+void luaStopScript(uint8_t screenId, bool clearDisplay = true);
 
 // Check if a script is running on a screen
 bool luaHasScript(uint8_t screenId);

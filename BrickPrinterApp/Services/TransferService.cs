@@ -210,6 +210,37 @@ public class TransferService : ITransferService, IDisposable
         }
     }
 
+    public async Task<bool> IsScriptRunningAsync(int screenId = 0)
+    {
+        try
+        {
+            await ThrottleAsync();
+            try
+            {
+                var url = _settings.GetStatusUrl(screenId);
+                var response = await _httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                // Parse JSON to check if script is running
+                // Expected format: {"script_running": true/false}
+                return json.Contains("\"script_running\":true") || json.Contains("\"script_running\": true");
+            }
+            finally
+            {
+                CompleteRequest();
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public void StartKeepAlive(TimeSpan interval)
     {
         StopKeepAlive();

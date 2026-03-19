@@ -6,6 +6,7 @@ public interface ITransferService
     Task<bool> SendScriptAsync(string script, string language, int screenId = 0);
     Task<bool> StopScriptAsync(int screenId = 0);
     Task<bool> PingAsync();
+    Task<bool> IsScriptRunningAsync(int screenId = 0);
     void StartKeepAlive(TimeSpan interval);
     void StopKeepAlive();
     bool IsConnected { get; }
