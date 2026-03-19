@@ -3,6 +3,7 @@
 #include "lua_runtime.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <HTTPClient.h>
 
 static AsyncWebServer server(SERVER_PORT);
 
@@ -13,6 +14,19 @@ static volatile bool newDataAvailable[NUM_DISPLAYS] = {false, false, false};
 // Connection state
 static volatile bool firstContactEstablished = false;
 static volatile unsigned long lastContactTime = 0;
+
+// Server IP for recovery (saved from ping requests)
+static String serverIP = "";
+static volatile bool hasServerIP = false;
+
+// Screen content tracking
+static volatile unsigned long screenContentTime[NUM_DISPLAYS] = {0, 0, 0};
+static volatile bool screenHasContent[NUM_DISPLAYS] = {false, false, false};
+
+// Recovery state
+static volatile unsigned long lastRecoveryAttempt[NUM_DISPLAYS] = {0, 0, 0};
+static const unsigned long RECOVERY_COOLDOWN_MS = 10000;  // 10 seconds between recovery attempts
+static const unsigned long SCREEN_IDLE_THRESHOLD_MS = 5000;  // 5 seconds of no content before recovery
 
 // Temporary buffer for receiving data
 static uint8_t tempBuffer[DISPLAY_BUFFER_SIZE];
@@ -143,6 +157,13 @@ static void handleRoot(AsyncWebServerRequest *request) {
 
 static void handlePing(AsyncWebServerRequest *request) {
     updateContactTime();
+
+    // Save the server IP from the request
+    IPAddress clientIP = request->client()->remoteIP();
+    serverIP = clientIP.toString();
+    hasServerIP = true;
+    Serial.printf("Ping from server: %s\n", serverIP.c_str());
+
     // Minimal response for speed
     request->send(200, "text/plain", "ok");
 }
@@ -188,11 +209,13 @@ static void handleClear(AsyncWebServerRequest *request) {
             request->send(400, "application/json", "{\"error\":\"Invalid screen ID\"}");
             return;
         }
+        luaStopScript(screenId);
         serverClearDisplayBuffer(screenId);
         request->send(200, "application/json", "{\"message\":\"Display " + String(screenId) + " cleared\"}");
     } else {
-        // Clear all displays
+        // Clear all displays and stop all Lua scripts
         for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+            luaStopScript(i);
             serverClearDisplayBuffer(i);
         }
         request->send(200, "application/json", "{\"message\":\"All displays cleared\"}");
@@ -218,10 +241,21 @@ static void handleUploadComplete(AsyncWebServerRequest *request) {
 
     updateContactTime();
 
+    // Save the server IP from the request
+    IPAddress clientIP = request->client()->remoteIP();
+    serverIP = clientIP.toString();
+    hasServerIP = true;
+
+    // Stop any running Lua script on this screen before updating with binary data
+    luaStopScript(pendingScreenId);
+
     // Copy temp buffer to display buffer for the target screen
     memcpy(displayBuffers[pendingScreenId], tempBuffer, DISPLAY_BUFFER_SIZE);
     newDataAvailable[pendingScreenId] = true;
     tempBufferIndex = 0;
+
+    // Mark screen as having content
+    serverMarkScreenContent(pendingScreenId);
 
     Serial.printf("Display %d data received successfully\n", pendingScreenId);
     request->send(200, "application/json",
@@ -289,6 +323,11 @@ static void handleLuaComplete(AsyncWebServerRequest *request) {
 
     updateContactTime();
 
+    // Save the server IP from the request
+    IPAddress clientIP = request->client()->remoteIP();
+    serverIP = clientIP.toString();
+    hasServerIP = true;
+
     // Null-terminate the script
     luaScriptBuffer[luaScriptIndex] = '\0';
 
@@ -297,6 +336,8 @@ static void handleLuaComplete(AsyncWebServerRequest *request) {
     luaScriptIndex = 0;
 
     if (success) {
+        // Mark screen as having content
+        serverMarkScreenContent(luaPendingScreenId);
         request->send(200, "application/json",
             "{\"message\":\"Script loaded\",\"screen\":" + String(luaPendingScreenId) + "}");
     } else {
@@ -326,4 +367,100 @@ static void handleLuaStop(AsyncWebServerRequest *request) {
 
 bool serverHasLuaScript(uint8_t screenId) {
     return luaHasScript(screenId);
+}
+
+// ============ Recovery System ============
+
+bool serverHasServerIP() {
+    return hasServerIP;
+}
+
+String serverGetServerIP() {
+    return serverIP;
+}
+
+void serverMarkScreenContent(uint8_t screenId) {
+    if (screenId < NUM_DISPLAYS) {
+        screenContentTime[screenId] = millis();
+        screenHasContent[screenId] = true;
+    }
+}
+
+unsigned long serverGetScreenIdleTime(uint8_t screenId) {
+    if (screenId >= NUM_DISPLAYS) return ULONG_MAX;
+    if (!screenHasContent[screenId]) return ULONG_MAX;
+    return millis() - screenContentTime[screenId];
+}
+
+bool serverScreenHasContent(uint8_t screenId) {
+    if (screenId >= NUM_DISPLAYS) return false;
+
+    // Screen has content if it has a Lua script running
+    if (luaHasScript(screenId)) return true;
+
+    // Or if it received display data recently
+    return screenHasContent[screenId];
+}
+
+bool serverRequestRecovery(uint8_t screenId) {
+    if (!hasServerIP) {
+        Serial.println("Recovery: No server IP saved");
+        return false;
+    }
+
+    if (screenId >= NUM_DISPLAYS) {
+        Serial.println("Recovery: Invalid screen ID");
+        return false;
+    }
+
+    // Check cooldown
+    unsigned long now = millis();
+    if (now - lastRecoveryAttempt[screenId] < RECOVERY_COOLDOWN_MS) {
+        return false;  // Silent fail, still in cooldown
+    }
+    lastRecoveryAttempt[screenId] = now;
+
+    Serial.printf("Recovery: Requesting widget for screen %d from %s\n", screenId, serverIP.c_str());
+
+    HTTPClient http;
+    String url = "http://" + serverIP + ":5225/recovery?screen=" + String(screenId);
+
+    http.begin(url);
+    http.setTimeout(5000);  // 5 second timeout
+
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+        Serial.printf("Recovery: Response code %d\n", httpCode);
+        if (httpCode == HTTP_CODE_OK) {
+            String response = http.getString();
+            Serial.printf("Recovery: %s\n", response.c_str());
+            http.end();
+            return true;
+        }
+    } else {
+        Serial.printf("Recovery: Request failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+
+    http.end();
+    return false;
+}
+
+void serverRequestRecoveryForEmptyScreens() {
+    // Only try recovery if we have server IP and first contact was made
+    if (!hasServerIP || !firstContactEstablished) return;
+
+    unsigned long now = millis();
+
+    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        // Check if screen is empty (no Lua script and no recent display data)
+        bool hasLua = luaHasScript(i);
+        bool hasRecentContent = screenHasContent[i] &&
+            (now - screenContentTime[i] < SCREEN_IDLE_THRESHOLD_MS);
+
+        if (!hasLua && !hasRecentContent) {
+            // Screen is empty, try recovery
+            serverRequestRecovery(i);
+        }
+    }
 }

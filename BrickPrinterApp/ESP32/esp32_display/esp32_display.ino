@@ -51,6 +51,10 @@
 bool showingIPScreen = true;
 bool wifiConnected = false;
 
+// Recovery timing
+unsigned long lastRecoveryCheck = 0;
+const unsigned long RECOVERY_CHECK_INTERVAL = 5000;  // Check every 5 seconds
+
 void setup() {
     Serial.begin(115200);
     Serial.println("\n\nESP32 Multi-Display Receiver Starting...");
@@ -240,6 +244,13 @@ void loop() {
     if (showingIPScreen && serverHasFirstContact()) {
         // First contact made but no display data yet
         // Keep showing IP - will update when actual data arrives
+    }
+
+    // Recovery check: request widget re-initialization for empty screens
+    unsigned long now = millis();
+    if (now - lastRecoveryCheck >= RECOVERY_CHECK_INTERVAL) {
+        lastRecoveryCheck = now;
+        serverRequestRecoveryForEmptyScreens();
     }
 
     delay(10);

@@ -36,4 +36,27 @@ unsigned long serverGetLastContactAge();
 // Lua script management
 bool serverHasLuaScript(uint8_t screenId);
 
+// Recovery system
+// Check if server IP has been saved
+bool serverHasServerIP();
+
+// Get the saved server IP
+String serverGetServerIP();
+
+// Check if a screen has content (Lua script or display data received)
+bool serverScreenHasContent(uint8_t screenId);
+
+// Request widget recovery from server for a specific screen
+// Returns true if request was sent successfully
+bool serverRequestRecovery(uint8_t screenId);
+
+// Request recovery for all empty screens
+void serverRequestRecoveryForEmptyScreens();
+
+// Mark a screen as having received content
+void serverMarkScreenContent(uint8_t screenId);
+
+// Get time since last content was received for a screen (ms)
+unsigned long serverGetScreenIdleTime(uint8_t screenId);
+
 #endif

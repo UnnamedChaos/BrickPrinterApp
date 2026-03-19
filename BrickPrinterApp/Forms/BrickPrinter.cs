@@ -12,15 +12,17 @@ public partial class BrickPrinter : Form
     private readonly ITextService _textService;
     private readonly SettingService _settings;
     private readonly WidgetService _widgetService;
+    private readonly RecoveryListenerService _recoveryListener;
     private NotifyIcon? _trayIcon;
     private ContextMenuStrip? _trayMenu;
 
-    public BrickPrinter(ITransferService transferService, ITextService textService, SettingService settings, WidgetService widgetService, IHost host)
+    public BrickPrinter(ITransferService transferService, ITextService textService, SettingService settings, WidgetService widgetService, RecoveryListenerService recoveryListener, IHost host)
     {
         _transferService = transferService;
         _textService = textService;
         _settings = settings;
         _widgetService = widgetService;
+        _recoveryListener = recoveryListener;
         _host = host;
 
         InitializeComponent();
@@ -32,6 +34,9 @@ public partial class BrickPrinter : Form
 
         // Start keep-alive to maintain connection (ping every 15 seconds)
         _transferService.StartKeepAlive(TimeSpan.FromSeconds(60));
+
+        // Start recovery listener for ESP32 widget re-initialization requests
+        _recoveryListener.Start();
     }
 
     private void RegisterTrayIcon()
@@ -122,6 +127,7 @@ public partial class BrickPrinter : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _transferService.StopKeepAlive();
+        _recoveryListener.Stop();
         _widgetService.Dispose();
         base.OnFormClosing(e);
     }

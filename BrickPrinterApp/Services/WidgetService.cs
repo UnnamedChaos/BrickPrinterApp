@@ -130,6 +130,58 @@ public class WidgetService : IDisposable
         _ = _transferService.StopScriptAsync(screenId);
     }
 
+    /// <summary>
+    /// Re-sends the current widget for a specific screen (for recovery after ESP32 restart)
+    /// </summary>
+    public async Task<bool> ResendWidgetAsync(int screenId)
+    {
+        object? widget;
+        lock (_lock)
+        {
+            widget = _screenWidgets.GetValueOrDefault(screenId);
+        }
+
+        if (widget == null)
+        {
+            Console.WriteLine($"Recovery: No widget assigned to screen {screenId}");
+            return false;
+        }
+
+        try
+        {
+            if (widget is IScriptWidget scriptWidget)
+            {
+                Console.WriteLine($"Recovery: Resending script widget to screen {screenId}");
+                var script = scriptWidget.GetScript();
+                return await _transferService.SendScriptAsync(script, scriptWidget.ScriptLanguage, screenId);
+            }
+            else if (widget is IWidget regularWidget)
+            {
+                Console.WriteLine($"Recovery: Resending widget to screen {screenId}");
+                var content = regularWidget.GetContent();
+                return await _transferService.SendBinaryDataAsync(content, screenId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Recovery: Error resending widget to screen {screenId}: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Re-sends all active widgets (for recovery after ESP32 restart)
+    /// </summary>
+    public async Task ResendAllWidgetsAsync()
+    {
+        Console.WriteLine("Recovery: Resending all widgets");
+        for (int i = 0; i < SettingService.NumScreens; i++)
+        {
+            await ResendWidgetAsync(i);
+        }
+    }
+
     private void StopScreenOperations(int screenId)
     {
         // Cancel any pending async operations

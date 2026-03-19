@@ -17,6 +17,7 @@ struct LuaScreen {
 static LuaScreen screens[NUM_DISPLAYS];
 static char lastError[128] = "";
 static uint8_t currentScreen = 0;
+static volatile bool luaVMBusy = false;  // Prevent race between webserver and main loop
 
 // Lua bindings - flat function names since we can't create tables
 static int lua_display_clear(lua_State* L) {
@@ -133,9 +134,15 @@ static void registerCustomFunctions(LuaWrapper* lua) {
     lua->Lua_register("date", lua_time_date);
 }
 
-static bool ensureLuaInitialized() {
-    if (sharedLua != nullptr) return true;
+static void destroyLua() {
+    if (sharedLua != nullptr) {
+        delete sharedLua;
+        sharedLua = nullptr;
+        Serial.println("Lua VM destroyed");
+    }
+}
 
+static bool createLua() {
     sharedLua = new LuaWrapper();
     if (!sharedLua) {
         snprintf(lastError, sizeof(lastError), "Failed to create Lua instance");
@@ -143,8 +150,17 @@ static bool ensureLuaInitialized() {
     }
 
     registerCustomFunctions(sharedLua);
-    Serial.println("Shared Lua instance created");
+    Serial.printf("Lua VM created (free heap: %d)\n", ESP.getFreeHeap());
     return true;
+}
+
+static bool ensureLuaInitialized(bool forceRecreate = false) {
+    if (forceRecreate && sharedLua != nullptr) {
+        destroyLua();
+    }
+
+    if (sharedLua != nullptr) return true;
+    return createLua();
 }
 
 void luaInit() {
@@ -163,12 +179,31 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
         return false;
     }
 
-    // Stop any existing script on this screen
-    luaStopScript(screenId);
+    // Block luaTick() while we modify the VM
+    luaVMBusy = true;
 
-    // Initialize shared Lua if needed
-    if (!ensureLuaInitialized()) {
+    // Small delay to let any in-progress luaTick() complete
+    delay(20);
+
+    // Mark this screen as inactive (we'll reactivate after loading)
+    screens[screenId].script = "";
+    screens[screenId].active = false;
+    displayClear(screenId);
+
+    // Force recreate Lua VM to prevent memory accumulation
+    // All scripts are re-executed from their stored strings each tick,
+    // so we don't lose anything by starting fresh
+    if (!ensureLuaInitialized(true)) {
+        luaVMBusy = false;
         return false;
+    }
+
+    // Re-run any other active scripts so they're in the fresh VM
+    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        if (i != screenId && screens[i].active && screens[i].script.length() > 0) {
+            currentScreen = i;
+            sharedLua->Lua_dostring(&screens[i].script);
+        }
     }
 
     // Store script
@@ -184,12 +219,14 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
         snprintf(lastError, sizeof(lastError), "Lua error: %.100s", result.c_str());
         Serial.printf("Lua error on screen %d: %s\n", screenId, lastError);
         screens[screenId].script = "";
+        luaVMBusy = false;
         return false;
     }
 
     screens[screenId].active = true;
     screens[screenId].lastRun = millis();
 
+    luaVMBusy = false;
     Serial.printf("Lua script loaded on screen %d\n", screenId);
     return true;
 }
@@ -197,11 +234,32 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
 void luaStopScript(uint8_t screenId) {
     if (screenId >= NUM_DISPLAYS) return;
 
+    bool wasActive = screens[screenId].active;
     screens[screenId].script = "";
     screens[screenId].active = false;
 
     displayClear(screenId);
-    Serial.printf("Lua script stopped on screen %d\n", screenId);
+
+    if (wasActive) {
+        Serial.printf("Lua script stopped on screen %d\n", screenId);
+
+        // Check if all scripts are now inactive
+        bool anyActive = false;
+        for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+            if (screens[i].active) {
+                anyActive = true;
+                break;
+            }
+        }
+
+        // If no scripts are running, destroy the Lua VM to free memory
+        if (!anyActive) {
+            luaVMBusy = true;
+            delay(20);  // Let any in-progress luaTick() complete
+            destroyLua();
+            luaVMBusy = false;
+        }
+    }
 }
 
 bool luaHasScript(uint8_t screenId) {
@@ -210,7 +268,7 @@ bool luaHasScript(uint8_t screenId) {
 }
 
 void luaTick() {
-    if (!sharedLua) return;
+    if (luaVMBusy || !sharedLua) return;
 
     unsigned long now = millis();
 
