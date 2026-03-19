@@ -7,12 +7,33 @@ public class WidgetManagerForm : Form
 {
     private readonly WidgetService _widgetService;
     private readonly List<ComboBox> _screenDropdowns = new();
+    private readonly List<(string Name, object Widget, bool IsScript)> _allWidgets = new();
+    private readonly int[] _originalSelections;
 
     public WidgetManagerForm(WidgetService widgetService)
     {
         _widgetService = widgetService;
+        _originalSelections = new int[SettingService.NumScreens];
+        BuildWidgetList();
         InitializeComponents();
         LoadCurrentAssignments();
+    }
+
+    private void BuildWidgetList()
+    {
+        _allWidgets.Clear();
+
+        // Add binary widgets
+        foreach (var widget in _widgetService.AvailableWidgets)
+        {
+            _allWidgets.Add((widget.Name, widget, false));
+        }
+
+        // Add script widgets (marked with icon)
+        foreach (var widget in _widgetService.AvailableScriptWidgets)
+        {
+            _allWidgets.Add(($"[Lua] {widget.Name}", widget, true));
+        }
     }
 
     private void InitializeComponents()
@@ -26,8 +47,6 @@ public class WidgetManagerForm : Form
 
         for (int i = 0; i < SettingService.NumScreens; i++)
         {
-            var screenId = i;
-
             var label = new Label
             {
                 Text = $"Screen {i}:",
@@ -42,16 +61,12 @@ public class WidgetManagerForm : Form
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
 
-            // Add "None" option
             dropdown.Items.Add("(Kein Widget)");
 
-            // Add all available widgets
-            foreach (var widget in _widgetService.AvailableWidgets)
+            foreach (var (name, _, _) in _allWidgets)
             {
-                dropdown.Items.Add(widget.Name);
+                dropdown.Items.Add(name);
             }
-
-            dropdown.SelectedIndexChanged += (_, _) => OnWidgetSelectionChanged(screenId, dropdown);
 
             _screenDropdowns.Add(dropdown);
             Controls.Add(label);
@@ -59,24 +74,22 @@ public class WidgetManagerForm : Form
 
             yOffset += 35;
         }
+        
+        Controls.Add(CreateButton(yOffset, "Anwenden", 20, 90, ApplyChanges));
+        Controls.Add(CreateButton(yOffset, "Alle senden", 120, 90, ResendAll));
+        Controls.Add(CreateButton(yOffset, "Schließen", 220, 90, Close));
+    }
 
+    private Button CreateButton(int yOffset, string text,  int size,  int width, Action applyChanges)
+    {
         var btnApply = new Button
         {
-            Text = "Anwenden",
-            Location = new Point(100, yOffset + 10),
-            Width = 100
+            Text = text,
+            Location = new Point(size, yOffset + 10),
+            Width = width
         };
-        btnApply.Click += (_, _) => ApplyChanges();
-        Controls.Add(btnApply);
-
-        var btnClose = new Button
-        {
-            Text = "Schliessen",
-            Location = new Point(210, yOffset + 10),
-            Width = 90
-        };
-        btnClose.Click += (_, _) => Close();
-        Controls.Add(btnClose);
+        btnApply.Click += (_, _) => applyChanges();
+        return btnApply;
     }
 
     private void LoadCurrentAssignments()
@@ -88,25 +101,60 @@ public class WidgetManagerForm : Form
 
             if (currentWidget == null)
             {
-                dropdown.SelectedIndex = 0; // "(Kein Widget)"
+                dropdown.SelectedIndex = 0;
             }
             else
             {
-                var index = _widgetService.AvailableWidgets
-                    .ToList()
-                    .FindIndex(w => w.Name == currentWidget.Name);
+                var widgetName = currentWidget switch
+                {
+                    IWidget w => w.Name,
+                    IScriptWidget sw => $"[Lua] {sw.Name}",
+                    _ => null
+                };
 
-                dropdown.SelectedIndex = index + 1; // +1 because of "(Kein Widget)"
+                var index = _allWidgets.FindIndex(w => w.Name == widgetName);
+                dropdown.SelectedIndex = index >= 0 ? index + 1 : 0;
             }
+
+            _originalSelections[i] = dropdown.SelectedIndex;
         }
     }
 
-    private void OnWidgetSelectionChanged(int screenId, ComboBox dropdown)
+    private void ApplyChanges()
     {
-        // Changes are applied on button click
+        for (int i = 0; i < SettingService.NumScreens; i++)
+        {
+            var dropdown = _screenDropdowns[i];
+            var selectedIndex = dropdown.SelectedIndex;
+
+            // Skip if selection hasn't changed
+            if (selectedIndex == _originalSelections[i])
+                continue;
+
+            if (selectedIndex == 0)
+            {
+                _widgetService.RemoveWidgetFromScreen(i);
+            }
+            else
+            {
+                var (_, widget, isScript) = _allWidgets[selectedIndex - 1];
+
+                if (isScript)
+                {
+                    _widgetService.AssignScriptWidgetToScreen(i, (IScriptWidget)widget);
+                }
+                else
+                {
+                    _widgetService.AssignWidgetToScreen(i, (IWidget)widget);
+                }
+            }
+
+            // Update original selection to new value
+            _originalSelections[i] = selectedIndex;
+        }
     }
 
-    private void ApplyChanges()
+    private void ResendAll()
     {
         for (int i = 0; i < SettingService.NumScreens; i++)
         {
@@ -119,9 +167,19 @@ public class WidgetManagerForm : Form
             }
             else
             {
-                var widget = _widgetService.AvailableWidgets[selectedIndex - 1];
-                _widgetService.AssignWidgetToScreen(i, widget);
+                var (_, widget, isScript) = _allWidgets[selectedIndex - 1];
+
+                if (isScript)
+                {
+                    _widgetService.AssignScriptWidgetToScreen(i, (IScriptWidget)widget);
+                }
+                else
+                {
+                    _widgetService.AssignWidgetToScreen(i, (IWidget)widget);
+                }
             }
+
+            _originalSelections[i] = selectedIndex;
         }
     }
 }

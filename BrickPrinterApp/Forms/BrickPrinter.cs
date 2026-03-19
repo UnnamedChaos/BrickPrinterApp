@@ -31,7 +31,7 @@ public partial class BrickPrinter : Form
         ShowInTaskbar = false;
 
         // Start keep-alive to maintain connection (ping every 15 seconds)
-        _transferService.StartKeepAlive(TimeSpan.FromSeconds(15));
+        _transferService.StartKeepAlive(TimeSpan.FromSeconds(60));
     }
 
     private void RegisterTrayIcon()

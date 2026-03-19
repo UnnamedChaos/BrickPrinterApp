@@ -32,4 +32,9 @@
       <Folder Include="Widgets\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <EmbeddedResource Include="Scripts\*.lua" />
+      <EmbeddedResource Include="Resources\logo.png" />
+    </ItemGroup>
+
 </Project>

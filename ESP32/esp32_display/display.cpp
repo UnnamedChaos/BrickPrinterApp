@@ -44,7 +44,7 @@ bool displayInit() {
         if (displays[i]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
             displays[i]->clearDisplay();
             displays[i]->setTextSize(1);
-            displays[i]->setTextColor(SSD1306_WHITE);
+            displays[i]->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
             displays[i]->display();
             displayInitialized[i] = true;
             anySuccess = true;
@@ -127,11 +127,10 @@ void displayUpdate(uint8_t screenId, const uint8_t* buffer) {
         displays[screenId]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
     }
 
-    displays[screenId]->clearDisplay();
-
     // Data is in SSD1306 page format:
     // 8 pages of 128 bytes each
     // Each byte = 8 vertical pixels (bit 0 = top, bit 7 = bottom)
+    // Draw both white AND black pixels to avoid flicker (no clearDisplay needed)
 
     for (int page = 0; page < 8; page++) {
         for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -139,9 +138,8 @@ void displayUpdate(uint8_t screenId, const uint8_t* buffer) {
 
             for (int bit = 0; bit < 8; bit++) {
                 int y = page * 8 + bit;
-                if (columnByte & (1 << bit)) {
-                    displays[screenId]->drawPixel(x, y, SSD1306_WHITE);
-                }
+                displays[screenId]->drawPixel(x, y,
+                    (columnByte & (1 << bit)) ? SSD1306_WHITE : SSD1306_BLACK);
             }
         }
     }
@@ -192,4 +190,75 @@ uint8_t displayCheckAllScreens() {
     }
 
     return result;
+}
+
+// ============ Lua Drawing Functions ============
+
+// Track which screen is currently selected for Lua drawing
+static uint8_t currentLuaScreen = 255;
+
+// Switch to screen for Lua drawing (just switch I2C bus, no begin())
+static void selectLuaScreen(uint8_t screenId) {
+    if (currentLuaScreen != screenId) {
+        switchBus(screenId);
+        currentLuaScreen = screenId;
+    }
+}
+
+void displayClearBuffer(uint8_t screenId) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    displays[screenId]->clearDisplay();
+}
+
+void displayDrawText(uint8_t screenId, int x, int y, const char* text) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    displays[screenId]->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    displays[screenId]->setCursor(x, y);
+    displays[screenId]->print(text);
+}
+
+void displaySetFontSize(uint8_t screenId, int size) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    displays[screenId]->setTextSize(size > 0 ? size : 1);
+}
+
+void displayDrawPixel(uint8_t screenId, int x, int y, bool on) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    displays[screenId]->drawPixel(x, y, on ? SSD1306_WHITE : SSD1306_BLACK);
+}
+
+void displayDrawRect(uint8_t screenId, int x, int y, int w, int h, bool filled) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    if (filled) {
+        displays[screenId]->fillRect(x, y, w, h, SSD1306_WHITE);
+    } else {
+        displays[screenId]->drawRect(x, y, w, h, SSD1306_WHITE);
+    }
+}
+
+void displayDrawLine(uint8_t screenId, int x1, int y1, int x2, int y2) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    displays[screenId]->drawLine(x1, y1, x2, y2, SSD1306_WHITE);
+}
+
+void displayDrawCircle(uint8_t screenId, int x, int y, int r, bool filled) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    if (filled) {
+        displays[screenId]->fillCircle(x, y, r, SSD1306_WHITE);
+    } else {
+        displays[screenId]->drawCircle(x, y, r, SSD1306_WHITE);
+    }
+}
+
+void displayRefresh(uint8_t screenId) {
+    if (!displayIsValidScreen(screenId)) return;
+    selectLuaScreen(screenId);
+    displays[screenId]->display();
 }

@@ -33,4 +33,7 @@ bool serverHasFirstContact();
 // Get milliseconds since last contact
 unsigned long serverGetLastContactAge();
 
+// Lua script management
+bool serverHasLuaScript(uint8_t screenId);
+
 #endif

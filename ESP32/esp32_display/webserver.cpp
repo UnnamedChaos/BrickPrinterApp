@@ -1,5 +1,6 @@
 #include "webserver.h"
 #include "display.h"
+#include "lua_runtime.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 
@@ -26,6 +27,13 @@ static void handleClear(AsyncWebServerRequest *request);
 static void handleUploadComplete(AsyncWebServerRequest *request);
 static void handleUploadBody(AsyncWebServerRequest *request, uint8_t *data,
                              size_t len, size_t index, size_t total);
+static void handleLuaComplete(AsyncWebServerRequest *request);
+static void handleLuaStop(AsyncWebServerRequest *request);
+
+// Lua script buffer
+static char luaScriptBuffer[4096];
+static size_t luaScriptIndex = 0;
+static uint8_t luaPendingScreenId = 0;
 
 void serverInit() {
     // Root - info page
@@ -42,6 +50,10 @@ void serverInit() {
 
     // Upload endpoint - handles binary POST data
     server.on("/upload", HTTP_POST, handleUploadComplete, NULL, handleUploadBody);
+
+    // Lua script endpoints
+    server.on("/lua", HTTP_POST, handleLuaComplete);
+    server.on("/lua/stop", HTTP_POST, handleLuaStop);
 
     // Enable keep-alive
     DefaultHeaders::Instance().addHeader("Connection", "keep-alive");
@@ -235,4 +247,83 @@ static void handleUploadBody(AsyncWebServerRequest *request, uint8_t *data,
     for (size_t i = 0; i < len && tempBufferIndex < DISPLAY_BUFFER_SIZE; i++) {
         tempBuffer[tempBufferIndex++] = data[i];
     }
+}
+
+// ============ Lua Handlers ============
+
+static void handleLuaComplete(AsyncWebServerRequest *request) {
+    // Get screen ID from URL param
+    if (request->hasParam("screen")) {
+        luaPendingScreenId = request->getParam("screen")->value().toInt();
+    } else {
+        luaPendingScreenId = 0;
+    }
+
+    String scriptBody = "";
+
+    // Check for "script" form field (POST body)
+    if (request->hasParam("script", true)) {
+        scriptBody = request->getParam("script", true)->value();
+        Serial.printf("Found script in 'script' param, size: %d\n", scriptBody.length());
+    }
+
+    // Copy to buffer
+    if (scriptBody.length() > 0) {
+        luaScriptIndex = min(scriptBody.length(), sizeof(luaScriptBuffer) - 1);
+        memcpy(luaScriptBuffer, scriptBody.c_str(), luaScriptIndex);
+        luaScriptBuffer[luaScriptIndex] = '\0';
+    }
+
+    Serial.printf("Lua script received for screen %d, size: %d\n", luaPendingScreenId, luaScriptIndex);
+
+    if (luaScriptIndex == 0) {
+        request->send(400, "application/json", "{\"error\":\"Empty script\"}");
+        return;
+    }
+
+    if (!displayIsValidScreen(luaPendingScreenId)) {
+        request->send(400, "application/json", "{\"error\":\"Invalid screen ID\"}");
+        luaScriptIndex = 0;
+        return;
+    }
+
+    updateContactTime();
+
+    // Null-terminate the script
+    luaScriptBuffer[luaScriptIndex] = '\0';
+
+    // Load and run the script
+    bool success = luaLoadScript(luaPendingScreenId, luaScriptBuffer);
+    luaScriptIndex = 0;
+
+    if (success) {
+        request->send(200, "application/json",
+            "{\"message\":\"Script loaded\",\"screen\":" + String(luaPendingScreenId) + "}");
+    } else {
+        String error = luaGetLastError();
+        request->send(400, "application/json",
+            "{\"error\":\"" + error + "\",\"screen\":" + String(luaPendingScreenId) + "}");
+    }
+}
+
+static void handleLuaStop(AsyncWebServerRequest *request) {
+    updateContactTime();
+
+    uint8_t screenId = 0;
+    if (request->hasParam("screen")) {
+        screenId = request->getParam("screen")->value().toInt();
+    }
+
+    if (!displayIsValidScreen(screenId)) {
+        request->send(400, "application/json", "{\"error\":\"Invalid screen ID\"}");
+        return;
+    }
+
+    luaStopScript(screenId);
+    request->send(200, "application/json",
+        "{\"message\":\"Script stopped\",\"screen\":" + String(screenId) + "}");
+}
+
+bool serverHasLuaScript(uint8_t screenId) {
+    return luaHasScript(screenId);
 }

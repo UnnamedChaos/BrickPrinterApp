@@ -32,9 +32,16 @@
 
 #include <WiFi.h>
 #include <ArduinoOTA.h>
+#include <time.h>
 #include "display.h"
 #include "webserver.h"
 #include "config.h"
+#include "lua_runtime.h"
+
+// NTP settings
+#define NTP_SERVER "pool.ntp.org"
+#define GMT_OFFSET_SEC 3600      // UTC+1 (Germany)
+#define DAYLIGHT_OFFSET_SEC 3600 // +1h for summer time
 
 // OTA settings
 #define OTA_HOSTNAME "ESP32_Display"
@@ -128,6 +135,14 @@ void setup() {
     // Setup OTA updates
     setupOTA();
 
+    // Initialize NTP time sync
+    configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+    Serial.println("NTP time sync initialized");
+
+    // Initialize Lua runtime
+    luaInit();
+    Serial.println("Lua runtime initialized");
+
     // Show IP on display (stays until first contact)
     displayShowIP(WiFi.localIP().toString().c_str());
 
@@ -136,6 +151,7 @@ void setup() {
 
     Serial.println("Ready. Type HELP for serial commands.");
     Serial.println("OTA enabled - upload via network port in Arduino IDE");
+    Serial.println("Lua scripting enabled via POST /lua?screen=X");
 }
 
 void setupOTA() {
@@ -215,6 +231,9 @@ void loop() {
             showingIPScreen = false;
         }
     }
+
+    // Execute Lua scripts (runs render() function periodically)
+    luaTick();
 
     // Keep showing IP screen until first contact
     // This ensures user can always see the IP before connection
