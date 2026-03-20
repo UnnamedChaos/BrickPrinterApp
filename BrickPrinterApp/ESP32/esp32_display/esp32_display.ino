@@ -121,7 +121,8 @@ void loop() {
         if (serverHasNewData(i)) {
             const uint8_t* buffer = serverGetDisplayBuffer(i);
             if (buffer) displayUpdate(i, buffer);
-            serverClearNewDataFlag(i);
+            // Don't clear the flag - it should stay true to indicate this screen has content
+            // Only clear when explicitly clearing the screen or when a Lua script takes over
             showingIPScreen = false;
         }
     }

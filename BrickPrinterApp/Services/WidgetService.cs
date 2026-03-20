@@ -10,6 +10,7 @@ public class WidgetService : IDisposable
     private readonly Dictionary<int, object?> _screenWidgets = new();
     private readonly Dictionary<int, Timer?> _screenTimers = new();
     private readonly Dictionary<int, CancellationTokenSource?> _screenCts = new();
+    private readonly Dictionary<int, bool> _screenUpdating = new(); // Track if screen is currently updating
     private readonly List<IWidget> _availableWidgets = new();
     private readonly List<IScriptWidget> _availableScriptWidgets = new();
     private readonly object _lock = new();
@@ -28,6 +29,7 @@ public class WidgetService : IDisposable
             _screenWidgets[i] = null;
             _screenTimers[i] = null;
             _screenCts[i] = null;
+            _screenUpdating[i] = false;
         }
     }
 
@@ -136,12 +138,19 @@ public class WidgetService : IDisposable
             if (status.Active) continue; // Screen is already active
 
             object? widget;
+            bool isUpdating;
             lock (_lock)
             {
                 widget = _screenWidgets.GetValueOrDefault(status.Id);
+                isUpdating = _screenUpdating.GetValueOrDefault(status.Id, false);
             }
 
             if (widget == null) continue; // No widget assigned, nothing to recover
+            if (isUpdating)
+            {
+                Console.WriteLine($"Recovery: Screen {status.Id} is already updating, skipping");
+                continue;
+            }
 
             try
             {
@@ -154,8 +163,7 @@ public class WidgetService : IDisposable
                 else if (widget is IWidget regularWidget)
                 {
                     Console.WriteLine($"Recovery: Resending widget to screen {status.Id}");
-                    var content = regularWidget.GetContent();
-                    await _transferService.SendBinaryDataAsync(content, status.Id);
+                    await SendWidgetContentWithLock(status.Id, regularWidget);
                 }
             }
             catch (Exception ex)
@@ -181,6 +189,9 @@ public class WidgetService : IDisposable
             timer.Dispose();
             _screenTimers[screenId] = null;
         }
+
+        // Clear updating flag
+        _screenUpdating[screenId] = false;
     }
 
     private async Task SendWidgetAndStartTimer(int screenId, IWidget widget, CancellationTokenSource cts)
@@ -231,6 +242,17 @@ public class WidgetService : IDisposable
 
     private async Task SendWidgetContent(int screenId, IWidget widget, CancellationToken ct)
     {
+        // Check if already updating
+        lock (_lock)
+        {
+            if (_screenUpdating.GetValueOrDefault(screenId, false))
+            {
+                Console.WriteLine($"Screen {screenId} is already updating, skipping");
+                return;
+            }
+            _screenUpdating[screenId] = true;
+        }
+
         try
         {
             if (ct.IsCancellationRequested) return;
@@ -241,9 +263,49 @@ public class WidgetService : IDisposable
 
             await _transferService.SendBinaryDataAsync(content, screenId);
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently handle errors
+            Console.WriteLine($"Error sending widget content to screen {screenId}: {ex.Message}");
+        }
+        finally
+        {
+            // Always clear the updating flag
+            lock (_lock)
+            {
+                _screenUpdating[screenId] = false;
+            }
+        }
+    }
+
+    private async Task SendWidgetContentWithLock(int screenId, IWidget widget)
+    {
+        // Check if already updating
+        lock (_lock)
+        {
+            if (_screenUpdating.GetValueOrDefault(screenId, false))
+            {
+                Console.WriteLine($"Screen {screenId} is already updating, skipping");
+                return;
+            }
+            _screenUpdating[screenId] = true;
+        }
+
+        try
+        {
+            var content = widget.GetContent();
+            await _transferService.SendBinaryDataAsync(content, screenId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error sending widget content to screen {screenId}: {ex.Message}");
+        }
+        finally
+        {
+            // Always clear the updating flag
+            lock (_lock)
+            {
+                _screenUpdating[screenId] = false;
+            }
         }
     }
 

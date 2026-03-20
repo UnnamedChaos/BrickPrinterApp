@@ -63,11 +63,6 @@ bool serverHasFirstContact() {
     return firstContactEstablished;
 }
 
-unsigned long serverGetLastContactAge() {
-    if (lastContactTime == 0) return ULONG_MAX;
-    return millis() - lastContactTime;
-}
-
 static void updateContactTime() {
     lastContactTime = millis();
     firstContactEstablished = true;
@@ -167,6 +162,8 @@ static void handleLuaComplete(AsyncWebServerRequest *request) {
     luaScriptIndex = 0;
 
     if (success) {
+        // Clear the binary data flag since Lua script is now in control
+        newDataAvailable[luaPendingScreenId] = false;
         request->send(200, "text/plain", "ok");
     } else {
         request->send(400, "text/plain", luaGetLastError());

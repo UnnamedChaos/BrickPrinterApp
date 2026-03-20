@@ -12,6 +12,5 @@ const uint8_t* serverGetDisplayBuffer(uint8_t screenId);
 void serverClearNewDataFlag(uint8_t screenId);
 void serverClearDisplayBuffer(uint8_t screenId);
 bool serverHasFirstContact();
-unsigned long serverGetLastContactAge();
 
 #endif
