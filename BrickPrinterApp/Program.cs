@@ -5,6 +5,7 @@ using BrickPrinterApp.Services;
 using BrickPrinterApp.Widgets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace BrickPrinterApp;
 
@@ -18,6 +19,11 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
         var builder = Host.CreateApplicationBuilder();
+
+        // Suppress System.Net info logging
+        builder.Logging.AddFilter("System.Net.Http", Microsoft.Extensions.Logging.LogLevel.Warning);
+        builder.Logging.AddFilter("System.Net.Sockets", Microsoft.Extensions.Logging.LogLevel.Warning);
+
         RegisterServices(builder);
         using var host = builder.Build();
 

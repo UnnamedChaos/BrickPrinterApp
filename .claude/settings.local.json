@@ -3,7 +3,8 @@
     "allow": [
       "Bash(dotnet build:*)",
       "WebFetch(domain:api.tomato.gg)",
-      "Bash(cmd.exe:*)"
+      "Bash(cmd.exe:*)",
+      "WebFetch(domain:api.open-meteo.com)"
     ]
   }
 }

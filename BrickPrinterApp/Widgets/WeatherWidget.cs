@@ -1,6 +1,5 @@
-using System.Drawing;
-using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BrickPrinterApp.Interfaces;
 using BrickPrinterApp.Services;
 
@@ -20,13 +19,24 @@ public class WeatherWidget : IWidget
     private const double Longitude = 13.41;
 
     public string Name => "Weather";
-    public TimeSpan UpdateInterval => TimeSpan.FromSeconds(25);
+    public TimeSpan UpdateInterval => TimeSpan.FromSeconds(60);
 
     public WeatherWidget(IDisplayService displayService)
     {
         _displayService = displayService;
         _httpClient = new HttpClient();
-        _httpClient.Timeout = TimeSpan.FromSeconds(10);
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+        // Try to fetch initial weather data
+        try
+        {
+            FetchWeatherData();
+            _lastFetch = DateTime.Now;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Initial weather fetch failed: {ex.Message}");
+        }
     }
 
     public byte[] GetContent()
@@ -39,30 +49,82 @@ public class WeatherWidget : IWidget
                 FetchWeatherData();
                 _lastFetch = DateTime.Now;
             }
-            catch
+            catch (Exception ex)
             {
-                // Keep using old data if fetch fails
+                // Log the error but keep using old data if fetch fails
+                Console.WriteLine($"Weather fetch failed: {ex.Message}");
             }
         }
 
         // Alternate between today and forecast screens
         var image = _showToday ? DrawTodayScreen() : DrawForecastScreen();
-        _showToday = !_showToday;
 
         return _displayService.ConvertImageToBinary(image);
     }
 
     private void FetchWeatherData()
     {
-        // Fetch current weather
+        // Fetch current weather using synchronous API to avoid deadlock
         var currentUrl = $"https://api.open-meteo.com/v1/forecast?latitude={Latitude}&longitude={Longitude}&current=temperature_2m,weathercode,windspeed_10m&timezone=auto";
-        var currentResponse = _httpClient.GetStringAsync(currentUrl).Result;
-        _currentWeather = JsonSerializer.Deserialize<WeatherData>(currentResponse);
+        Console.WriteLine($"Requesting current weather from: {currentUrl}");
 
-        // Fetch 3-day forecast
+        using var currentRequest = new HttpRequestMessage(HttpMethod.Get, currentUrl);
+        using var currentResponse = _httpClient.Send(currentRequest);
+        currentResponse.EnsureSuccessStatusCode();
+
+        var currentJson = currentResponse.Content.ReadAsStringAsync().Result;
+
+        try
+        {
+            // Try to deserialize as array first (API sometimes returns array)
+            if (currentJson.TrimStart().StartsWith('['))
+            {
+                Console.WriteLine("API returned an array, taking first element");
+                var weatherArray = JsonSerializer.Deserialize<WeatherData[]>(currentJson);
+                _currentWeather = weatherArray?.FirstOrDefault();
+            }
+            else
+            {
+                _currentWeather = JsonSerializer.Deserialize<WeatherData>(currentJson);
+            }
+            Console.WriteLine($"Successfully deserialized current weather: temp={_currentWeather?.current?.temperature_2m}°C, code={_currentWeather?.current?.weathercode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Current weather deserialization failed: {ex.Message}");
+            throw;
+        }
+
+        // Fetch 3-day forecast using synchronous API to avoid deadlock
         var forecastUrl = $"https://api.open-meteo.com/v1/forecast?latitude={Latitude}&longitude={Longitude}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&forecast_days=4";
-        var forecastResponse = _httpClient.GetStringAsync(forecastUrl).Result;
-        _forecast = JsonSerializer.Deserialize<ForecastData>(forecastResponse);
+        Console.WriteLine($"Requesting forecast from: {forecastUrl}");
+
+        using var forecastRequest = new HttpRequestMessage(HttpMethod.Get, forecastUrl);
+        using var forecastResponse = _httpClient.Send(forecastRequest);
+        forecastResponse.EnsureSuccessStatusCode();
+
+        var forecastJson = forecastResponse.Content.ReadAsStringAsync().Result;
+
+        try
+        {
+            // Try to deserialize as array first (API sometimes returns array)
+            if (forecastJson.TrimStart().StartsWith('['))
+            {
+                Console.WriteLine("API returned an array, taking first element");
+                var forecastArray = JsonSerializer.Deserialize<ForecastData[]>(forecastJson);
+                _forecast = forecastArray?.FirstOrDefault();
+            }
+            else
+            {
+                _forecast = JsonSerializer.Deserialize<ForecastData>(forecastJson);
+            }
+            Console.WriteLine($"Successfully deserialized forecast: {_forecast?.daily?.time?.Length} days");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Forecast deserialization failed: {ex.Message}");
+            throw;
+        }
     }
 
     private Bitmap DrawTodayScreen()
@@ -81,13 +143,13 @@ public class WeatherWidget : IWidget
         DrawText(g, "TODAY", 2, 2, new Font("Arial", 8, FontStyle.Bold));
 
         // Draw weather icon (centered top)
-        DrawWeatherIcon(g, _currentWeather.current.weathercode, 48, 12, 32);
+        DrawWeatherIcon(g, _currentWeather.current.weathercode, 12, 32, 32);
 
         // Draw temperature (large, centered)
         var temp = $"{Math.Round(_currentWeather.current.temperature_2m)}°C";
-        var font = new Font("Arial", 14, FontStyle.Bold);
+        var font = new Font("Arial", 18, FontStyle.Bold);
         var size = g.MeasureString(temp, font);
-        DrawText(g, temp, (int)((128 - size.Width) / 2), 48, font);
+        DrawText(g, temp, (int)((128 - size.Width)), 40, font);
 
         return bitmap;
     }
@@ -240,6 +302,9 @@ public class WeatherWidget : IWidget
     private class WeatherData
     {
         public CurrentWeather? current { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, object>? ExtensionData { get; set; }
     }
 
     private class CurrentWeather
@@ -247,11 +312,17 @@ public class WeatherWidget : IWidget
         public double temperature_2m { get; set; }
         public int weathercode { get; set; }
         public double windspeed_10m { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, object>? ExtensionData { get; set; }
     }
 
     private class ForecastData
     {
         public DailyForecast? daily { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, object>? ExtensionData { get; set; }
     }
 
     private class DailyForecast
@@ -260,5 +331,8 @@ public class WeatherWidget : IWidget
         public double[] temperature_2m_max { get; set; } = Array.Empty<double>();
         public double[] temperature_2m_min { get; set; } = Array.Empty<double>();
         public int[] weathercode { get; set; } = Array.Empty<int>();
+
+        [JsonExtensionData]
+        public Dictionary<string, object>? ExtensionData { get; set; }
     }
 }
