@@ -75,7 +75,17 @@ static void updateContactTime() {
 
 static void handlePing(AsyncWebServerRequest *request) {
     updateContactTime();
-    request->send(200, "text/plain", "ok");
+
+    // Return screen status for smart recovery
+    String json = "{\"screens\":[";
+    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        if (i > 0) json += ",";
+        bool hasContent = luaHasScript(i) || newDataAvailable[i];
+        json += "{\"id\":" + String(i) + ",\"active\":" + (hasContent ? "true" : "false") + "}";
+    }
+    json += "]}";
+
+    request->send(200, "application/json", json);
 }
 
 static void handleStatus(AsyncWebServerRequest *request) {

@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 using BrickPrinterApp.Interfaces;
 using Timer = System.Threading.Timer;
 
@@ -9,6 +10,7 @@ public class TransferService : ITransferService, IDisposable
     private readonly HttpClient _httpClient;
     private readonly SettingService _settings;
     private Timer? _keepAliveTimer;
+    private Func<ScreenStatus[], Task>? _onStatusCallback;
     private bool _isConnected;
     private readonly object _lock = new();
 
@@ -184,19 +186,40 @@ public class TransferService : ITransferService, IDisposable
 
     public async Task<bool> PingAsync()
     {
+        var status = await PingWithStatusAsync();
+        return status != null;
+    }
+
+    public async Task<ScreenStatus[]?> PingWithStatusAsync()
+    {
         try
         {
             await ThrottleAsync();
             try
             {
-                var success = await ExecuteWithRetryAsync(async () =>
+                var response = await _httpClient.GetAsync(_settings.PingUrl);
+                if (!response.IsSuccessStatusCode)
                 {
-                    var response = await _httpClient.GetAsync(_settings.PingUrl);
-                    return response.IsSuccessStatusCode;
-                });
+                    IsConnected = false;
+                    return null;
+                }
 
-                IsConnected = success;
-                return success;
+                IsConnected = true;
+                var json = await response.Content.ReadAsStringAsync();
+
+                // Parse JSON: {"screens":[{"id":0,"active":true},{"id":1,"active":false},...]}
+                using var doc = JsonDocument.Parse(json);
+                var screens = doc.RootElement.GetProperty("screens");
+                var result = new List<ScreenStatus>();
+
+                foreach (var screen in screens.EnumerateArray())
+                {
+                    var id = screen.GetProperty("id").GetInt32();
+                    var active = screen.GetProperty("active").GetBoolean();
+                    result.Add(new ScreenStatus(id, active));
+                }
+
+                return result.ToArray();
             }
             finally
             {
@@ -206,7 +229,7 @@ public class TransferService : ITransferService, IDisposable
         catch
         {
             IsConnected = false;
-            return false;
+            return null;
         }
     }
 
@@ -241,10 +264,27 @@ public class TransferService : ITransferService, IDisposable
         }
     }
 
-    public void StartKeepAlive(TimeSpan interval)
+    public void StartKeepAlive(TimeSpan interval, Func<ScreenStatus[], Task>? onStatus = null)
     {
         StopKeepAlive();
-        _keepAliveTimer = new Timer(async _ => await PingAsync(), null, TimeSpan.Zero, interval);
+        _onStatusCallback = onStatus;
+        _keepAliveTimer = new Timer(KeepAliveCallback, null, TimeSpan.Zero, interval);
+    }
+
+    private async void KeepAliveCallback(object? state)
+    {
+        var status = await PingWithStatusAsync();
+        if (status != null && _onStatusCallback != null)
+        {
+            try
+            {
+                await _onStatusCallback(status);
+            }
+            catch
+            {
+                // Ignore callback errors
+            }
+        }
     }
 
     public void StopKeepAlive()

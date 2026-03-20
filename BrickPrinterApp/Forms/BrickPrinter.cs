@@ -30,8 +30,8 @@ public partial class BrickPrinter : Form
         WindowState = FormWindowState.Minimized;
         ShowInTaskbar = false;
 
-        // Start keep-alive to maintain connection (ping every 15 seconds)
-        _transferService.StartKeepAlive(TimeSpan.FromSeconds(10));
+        // Start keep-alive with recovery callback
+        _transferService.StartKeepAlive(TimeSpan.FromSeconds(10), _widgetService.RecoverScreensAsync);
     }
 
     private void RegisterTrayIcon()

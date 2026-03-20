@@ -31,6 +31,9 @@ internal static class Program
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
 
+        // Load saved widget assignments
+        widgetService.LoadSavedAssignments();
+
         var mainForm = host.Services.GetRequiredService<BrickPrinter>();
         Application.Run(mainForm);
     }

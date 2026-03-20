@@ -18,8 +18,19 @@ app.UseHttpsRedirection();
 var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "output");
 Directory.CreateDirectory(outputDir);
 
-// Lightweight keep-alive endpoint
-app.MapGet("/ping", () => Results.Text("ok"));
+// Track screen activity for recovery simulation
+var screenActive = new bool[3];
+
+// Keep-alive with screen status for smart recovery
+app.MapGet("/ping", () => Results.Json(new
+{
+    screens = new[]
+    {
+        new { id = 0, active = screenActive[0] },
+        new { id = 1, active = screenActive[1] },
+        new { id = 2, active = screenActive[2] }
+    }
+}));
 
 // Status endpoint
 app.MapGet("/status", () => Results.Ok(new
@@ -39,9 +50,13 @@ app.MapPost("/clear", (HttpRequest request) =>
     if (request.Query.TryGetValue("screen", out var screenParam) && int.TryParse(screenParam, out var screenId))
     {
         Console.WriteLine($"Screen {screenId} cleared");
+        if (screenId >= 0 && screenId < screenActive.Length)
+            screenActive[screenId] = false;
         return Results.Ok(new { message = $"Display {screenId} cleared" });
     }
     Console.WriteLine("All screens cleared");
+    for (int i = 0; i < screenActive.Length; i++)
+        screenActive[i] = false;
     return Results.Ok(new { message = "All displays cleared" });
 });
 
@@ -76,7 +91,44 @@ app.MapPost("/upload", async (HttpRequest request) =>
 
     Console.WriteLine($"Screen {screenId}: Saved image to {filename}");
     Console.WriteLine($"Screen {screenId}: Saved text file to {textFilename}");
+
+    // Mark screen as active
+    if (screenId >= 0 && screenId < screenActive.Length)
+        screenActive[screenId] = true;
+
     return Results.Ok(new { message = "Image saved", screen = screenId, filename, textFilename });
+});
+
+// Lua script endpoint
+app.MapPost("/lua", (HttpRequest request) =>
+{
+    var screenId = 0;
+    if (request.Query.TryGetValue("screen", out var screenParam) && int.TryParse(screenParam, out var parsedId))
+        screenId = parsedId;
+
+    Console.WriteLine($"Screen {screenId}: Lua script received");
+
+    // Mark screen as active
+    if (screenId >= 0 && screenId < screenActive.Length)
+        screenActive[screenId] = true;
+
+    return Results.Ok("ok");
+});
+
+// Stop lua script endpoint
+app.MapPost("/lua/stop", (HttpRequest request) =>
+{
+    var screenId = 0;
+    if (request.Query.TryGetValue("screen", out var screenParam) && int.TryParse(screenParam, out var parsedId))
+        screenId = parsedId;
+
+    Console.WriteLine($"Screen {screenId}: Lua script stopped");
+
+    // Mark screen as inactive
+    if (screenId >= 0 && screenId < screenActive.Length)
+        screenActive[screenId] = false;
+
+    return Results.Ok("ok");
 });
 
 app.Run();

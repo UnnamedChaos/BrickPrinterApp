@@ -6,19 +6,22 @@ namespace BrickPrinterApp.Services;
 public class WidgetService : IDisposable
 {
     private readonly ITransferService _transferService;
+    private readonly SettingService _settingService;
     private readonly Dictionary<int, object?> _screenWidgets = new();
     private readonly Dictionary<int, Timer?> _screenTimers = new();
     private readonly Dictionary<int, CancellationTokenSource?> _screenCts = new();
     private readonly List<IWidget> _availableWidgets = new();
     private readonly List<IScriptWidget> _availableScriptWidgets = new();
     private readonly object _lock = new();
+    private bool _isLoading = false;
 
     public IReadOnlyList<IWidget> AvailableWidgets => _availableWidgets;
     public IReadOnlyList<IScriptWidget> AvailableScriptWidgets => _availableScriptWidgets;
 
-    public WidgetService(ITransferService transferService)
+    public WidgetService(ITransferService transferService, SettingService settingService)
     {
         _transferService = transferService;
+        _settingService = settingService;
 
         for (int i = 0; i < SettingService.NumScreens; i++)
         {
@@ -77,6 +80,8 @@ public class WidgetService : IDisposable
             // Just stop any running script
             _ = _transferService.StopScriptAsync(screenId);
         }
+
+        SaveCurrentAssignments();
     }
 
     public void AssignScriptWidgetToScreen(int screenId, IScriptWidget? widget)
@@ -105,6 +110,8 @@ public class WidgetService : IDisposable
             // Stop script when widget is removed
             _ = _transferService.StopScriptAsync(screenId);
         }
+
+        SaveCurrentAssignments();
     }
 
     public void RemoveWidgetFromScreen(int screenId)
@@ -116,6 +123,46 @@ public class WidgetService : IDisposable
         }
 
         _ = _transferService.StopScriptAsync(screenId);
+        SaveCurrentAssignments();
+    }
+
+    /// <summary>
+    /// Check screen status and resend widgets for screens that should be active but aren't
+    /// </summary>
+    public async Task RecoverScreensAsync(ScreenStatus[] screenStatus)
+    {
+        foreach (var status in screenStatus)
+        {
+            if (status.Active) continue; // Screen is already active
+
+            object? widget;
+            lock (_lock)
+            {
+                widget = _screenWidgets.GetValueOrDefault(status.Id);
+            }
+
+            if (widget == null) continue; // No widget assigned, nothing to recover
+
+            try
+            {
+                if (widget is IScriptWidget scriptWidget)
+                {
+                    Console.WriteLine($"Recovery: Resending script to screen {status.Id}");
+                    var script = scriptWidget.GetScript();
+                    await _transferService.SendScriptAsync(script, scriptWidget.ScriptLanguage, status.Id);
+                }
+                else if (widget is IWidget regularWidget)
+                {
+                    Console.WriteLine($"Recovery: Resending widget to screen {status.Id}");
+                    var content = regularWidget.GetContent();
+                    await _transferService.SendBinaryDataAsync(content, status.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Recovery error for screen {status.Id}: {ex.Message}");
+            }
+        }
     }
 
     private void StopScreenOperations(int screenId)
@@ -215,6 +262,73 @@ public class WidgetService : IDisposable
         catch
         {
             // Silently handle errors
+        }
+    }
+
+    private void SaveCurrentAssignments()
+    {
+        if (_isLoading) return;
+
+        lock (_lock)
+        {
+            _settingService.WidgetAssignments.Clear();
+
+            foreach (var (screenId, widget) in _screenWidgets)
+            {
+                if (widget == null)
+                {
+                    _settingService.WidgetAssignments[screenId] = null;
+                }
+                else if (widget is IWidget w)
+                {
+                    _settingService.WidgetAssignments[screenId] = w.Name;
+                }
+                else if (widget is IScriptWidget sw)
+                {
+                    _settingService.WidgetAssignments[screenId] = $"[Lua] {sw.Name}";
+                }
+            }
+
+            _settingService.Save();
+        }
+    }
+
+    public void LoadSavedAssignments()
+    {
+        _isLoading = true;
+
+        try
+        {
+            foreach (var (screenId, widgetName) in _settingService.WidgetAssignments)
+            {
+                if (string.IsNullOrEmpty(widgetName))
+                {
+                    continue;
+                }
+
+                // Check if it's a script widget
+                if (widgetName.StartsWith("[Lua] "))
+                {
+                    var scriptName = widgetName.Substring(6);
+                    var scriptWidget = _availableScriptWidgets.FirstOrDefault(w => w.Name == scriptName);
+                    if (scriptWidget != null)
+                    {
+                        AssignScriptWidgetToScreen(screenId, scriptWidget);
+                    }
+                }
+                else
+                {
+                    var widget = _availableWidgets.FirstOrDefault(w => w.Name == widgetName);
+                    if (widget != null)
+                    {
+                        AssignWidgetToScreen(screenId, widget);
+                    }
+                }
+            }
+        }
+        finally
+        {
+            _isLoading = false;
         }
     }
 

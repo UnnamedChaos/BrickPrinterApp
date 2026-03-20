@@ -12,6 +12,7 @@ public class SettingService
 
     public string EspIpAddress { get; set; } = "localhost:5224";
     public int SelectedScreen { get; set; } = 0;
+    public Dictionary<int, string?> WidgetAssignments { get; set; } = new();
     public string EndpointUrl => $"http://{EspIpAddress}/upload";
     public string PingUrl => $"http://{EspIpAddress}/ping";
     public const int ScreenHeight = 64;
@@ -34,7 +35,8 @@ public class SettingService
             var data = new SettingsData
             {
                 EspIpAddress = EspIpAddress,
-                SelectedScreen = SelectedScreen
+                SelectedScreen = SelectedScreen,
+                WidgetAssignments = WidgetAssignments
             };
             var json = JsonConvert.SerializeObject(data, Formatting.Indented);
             File.WriteAllText(SettingsFile, json);
@@ -57,6 +59,7 @@ public class SettingService
                 {
                     EspIpAddress = data.EspIpAddress ?? EspIpAddress;
                     SelectedScreen = data.SelectedScreen;
+                    WidgetAssignments = data.WidgetAssignments ?? new Dictionary<int, string?>();
                 }
             }
         }
@@ -70,5 +73,6 @@ public class SettingService
     {
         public string? EspIpAddress { get; set; }
         public int SelectedScreen { get; set; }
+        public Dictionary<int, string?>? WidgetAssignments { get; set; }
     }
 }
