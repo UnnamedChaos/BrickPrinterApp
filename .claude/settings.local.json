@@ -4,7 +4,8 @@
       "Bash(dotnet build:*)",
       "WebFetch(domain:api.tomato.gg)",
       "Bash(cmd.exe:*)",
-      "WebFetch(domain:api.open-meteo.com)"
+      "WebFetch(domain:api.open-meteo.com)",
+      "Bash(find:*)"
     ]
   }
 }

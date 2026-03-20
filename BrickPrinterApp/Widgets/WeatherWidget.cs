@@ -15,11 +15,11 @@ public class WeatherWidget : IWidget
     private DateTime _lastFetch = DateTime.MinValue;
 
     // Default location (can be made configurable)
-    private const double Latitude = 52.52;  // Berlin
-    private const double Longitude = 13.41;
+    private const double Latitude = 48.27;  // Berlin
+    private const double Longitude = 11.57;
 
     public string Name => "Weather";
-    public TimeSpan UpdateInterval => TimeSpan.FromSeconds(60);
+    public TimeSpan UpdateInterval => TimeSpan.FromSeconds(20);
 
     public WeatherWidget(IDisplayService displayService)
     {
@@ -55,7 +55,7 @@ public class WeatherWidget : IWidget
                 Console.WriteLine($"Weather fetch failed: {ex.Message}");
             }
         }
-
+        _showToday = !_showToday;
         // Alternate between today and forecast screens
         var image = _showToday ? DrawTodayScreen() : DrawForecastScreen();
 
@@ -189,8 +189,8 @@ public class WeatherWidget : IWidget
             // Temperature
             var maxTemp = Math.Round(_forecast.daily.temperature_2m_max[i]);
             var minTemp = Math.Round(_forecast.daily.temperature_2m_min[i]);
-            DrawText(g, $"{maxTemp}°", x, y + 30, new Font("Arial", 7, FontStyle.Bold));
-            DrawText(g, $"{minTemp}°", x, y + 40, new Font("Arial", 6));
+            DrawText(g, $"{maxTemp}°", x+4, y + 27, new Font("Arial", 8, FontStyle.Bold));
+            DrawText(g, $"{minTemp}°", x+4, y + 40, new Font("Arial", 6));
         }
 
         return bitmap;

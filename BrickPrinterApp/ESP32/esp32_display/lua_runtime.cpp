@@ -12,10 +12,19 @@ struct LuaScreen {
     unsigned long interval;
 };
 
+struct LuaScriptQueue {
+    uint8_t screenId;
+    String script;
+    bool pending;
+};
+
 static LuaScreen screens[NUM_DISPLAYS];
+static LuaScriptQueue scriptQueue[NUM_DISPLAYS];
 static char lastError[128] = "";
 static uint8_t currentScreen = 0;
 static volatile bool luaVMBusy = false;
+static volatile bool queueProcessing = false;
+static unsigned long lastQueueProcessTime = 0;
 
 static int lua_display_clear(lua_State* L) {
     displayClearBuffer(currentScreen);
@@ -156,35 +165,49 @@ void luaInit() {
         screens[i].active = false;
         screens[i].lastRun = 0;
         screens[i].interval = 1000;
+        scriptQueue[i].pending = false;
+        scriptQueue[i].script = "";
     }
+}
+
+void luaQueueScript(uint8_t screenId, const char* script) {
+    if (screenId >= NUM_DISPLAYS) return;
+    scriptQueue[screenId].screenId = screenId;
+    scriptQueue[screenId].script = String(script);
+    scriptQueue[screenId].pending = true;
+}
+
+bool luaIsQueueProcessing() {
+    return queueProcessing;
 }
 
 bool luaLoadScript(uint8_t screenId, const char* script) {
     if (screenId >= NUM_DISPLAYS) return false;
 
+    // Wait for any ongoing Lua execution to complete
+    while (luaVMBusy) {
+        yield();
+        delay(1);
+    }
+
     luaVMBusy = true;
-    delay(20);
 
     screens[screenId].script = "";
     screens[screenId].active = false;
     displayClear(screenId);
 
-    if (!ensureLuaInitialized(true)) {
+    // Simple approach: only create Lua VM if it doesn't exist
+    // Don't recreate it - this avoids the expensive re-execution of all scripts
+    if (!ensureLuaInitialized(false)) {
         luaVMBusy = false;
         return false;
     }
 
-    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
-        if (i != screenId && screens[i].active && screens[i].script.length() > 0) {
-            currentScreen = i;
-            sharedLua->Lua_dostring(&screens[i].script);
-            yield();
-        }
-    }
-
     screens[screenId].script = String(script);
     currentScreen = screenId;
+    yield(); // Yield before executing the new script
     String result = sharedLua->Lua_dostring(&screens[screenId].script);
+    yield(); // Yield after execution
 
     if (result.length() > 0 && result != "OK") {
         snprintf(lastError, sizeof(lastError), "%.120s", result.c_str());
@@ -214,9 +237,15 @@ void luaStopScript(uint8_t screenId, bool clearDisplay) {
             if (screens[i].active) { anyActive = true; break; }
         }
         if (!anyActive) {
+            // Wait for any ongoing Lua execution to complete
+            while (luaVMBusy) {
+                yield();
+                delay(1);
+            }
             luaVMBusy = true;
-            delay(20);
+            yield(); // Allow watchdog to reset before destroying VM
             destroyLua();
+            yield(); // Allow watchdog to reset after destroying VM
             luaVMBusy = false;
         }
     }
@@ -228,9 +257,35 @@ bool luaHasScript(uint8_t screenId) {
 }
 
 void luaTick() {
-    if (luaVMBusy || !sharedLua) return;
+    if (luaVMBusy) return;
 
     unsigned long now = millis();
+
+    // Process queued script loads first (one per tick with rate limiting)
+    if (now - lastQueueProcessTime >= 200) { // Wait at least 200ms between queue processing
+        for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+            if (scriptQueue[i].pending) {
+                queueProcessing = true;
+                lastQueueProcessTime = now;
+
+                // Use heap allocation to avoid stack overflow
+                const char* scriptPtr = scriptQueue[i].script.c_str();
+                scriptQueue[i].pending = false;
+
+                // Load the script (this may take time but we're in main loop)
+                luaLoadScript(i, scriptPtr);
+
+                // Clear the string after loading
+                scriptQueue[i].script = "";
+                queueProcessing = false;
+                return; // Only process one queued script per tick
+            }
+        }
+    }
+
+    if (!sharedLua) return;
+
+    // Run active scripts on their intervals
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
         if (!screens[i].active || now - screens[i].lastRun < screens[i].interval) continue;
         screens[i].lastRun = now;

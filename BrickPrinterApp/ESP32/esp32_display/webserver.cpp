@@ -158,16 +158,14 @@ static void handleLuaComplete(AsyncWebServerRequest *request) {
 
     updateContactTime();
 
-    bool success = luaLoadScript(luaPendingScreenId, luaScriptBuffer);
+    // Queue the script instead of executing it directly
+    // This prevents blocking the async_tcp task and causing watchdog timeout
+    luaQueueScript(luaPendingScreenId, luaScriptBuffer);
     luaScriptIndex = 0;
 
-    if (success) {
-        // Clear the binary data flag since Lua script is now in control
-        newDataAvailable[luaPendingScreenId] = false;
-        request->send(200, "text/plain", "ok");
-    } else {
-        request->send(400, "text/plain", luaGetLastError());
-    }
+    // Clear the binary data flag since Lua script will be in control
+    newDataAvailable[luaPendingScreenId] = false;
+    request->send(200, "text/plain", "ok");
 }
 
 static void handleLuaStop(AsyncWebServerRequest *request) {

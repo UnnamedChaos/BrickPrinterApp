@@ -11,10 +11,19 @@ static const uint8_t sdaPins[NUM_DISPLAYS] = {SDA_PIN_0, SDA_PIN_1, SDA_PIN_2};
 static const uint8_t sclPins[NUM_DISPLAYS] = {SCL_PIN_0, SCL_PIN_1, SCL_PIN_2};
 static bool displayInitialized[NUM_DISPLAYS] = {false, false, false};
 
+static uint8_t currentBusScreen = 255;  // Track which screen the I2C bus is currently on
+
 static void switchBus(uint8_t screenId) {
     Wire.end();
     delay(1);
     Wire.begin(sdaPins[screenId], sclPins[screenId]);
+}
+
+static void selectScreen(uint8_t screenId) {
+    if (currentBusScreen != screenId) {
+        switchBus(screenId);
+        currentBusScreen = screenId;
+    }
 }
 
 bool displayIsValidScreen(uint8_t screenId) {
@@ -24,7 +33,7 @@ bool displayIsValidScreen(uint8_t screenId) {
 bool displayInit() {
     bool anySuccess = false;
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
-        switchBus(i);
+        selectScreen(i);
         if (displays[i]->begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
             displays[i]->clearDisplay();
             displays[i]->setTextSize(1);
@@ -42,7 +51,7 @@ void displayShowMessage(uint8_t screenId, const char* line1, const char* line2,
                         const char* line5, const char* line6) {
     if (!displayIsValidScreen(screenId)) return;
 
-    switchBus(screenId);
+    selectScreen(screenId);
 
     displays[screenId]->clearDisplay();
     displays[screenId]->setCursor(0, 0);
@@ -69,7 +78,7 @@ void displayShowIP(const char* ip) {
     for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
         if (!displayIsValidScreen(i)) continue;
 
-        switchBus(i);
+        selectScreen(i);
 
         displays[i]->clearDisplay();
         displays[i]->setCursor(0, 0);
@@ -87,7 +96,7 @@ void displayShowIP(const char* ip) {
 void displayUpdate(uint8_t screenId, const uint8_t* buffer) {
     if (!displayIsValidScreen(screenId)) return;
 
-    switchBus(screenId);
+    selectScreen(screenId);
 
     for (int page = 0; page < 8; page++) {
         for (int x = 0; x < SCREEN_WIDTH; x++) {
@@ -104,14 +113,14 @@ void displayUpdate(uint8_t screenId, const uint8_t* buffer) {
 void displayClear(uint8_t screenId) {
     if (!displayIsValidScreen(screenId)) return;
 
-    switchBus(screenId);
+    selectScreen(screenId);
     displays[screenId]->clearDisplay();
     displays[screenId]->display();
 }
 
 bool displayCheckScreen(uint8_t screenId) {
     if (screenId >= NUM_DISPLAYS) return false;
-    switchBus(screenId);
+    selectScreen(screenId);
     Wire.beginTransmission(SCREEN_ADDRESS);
     uint8_t error = Wire.endTransmission();
     if (error == 0 && displayInitialized[screenId]) {
@@ -128,24 +137,15 @@ uint8_t displayCheckAllScreens() {
     return result;
 }
 
-static uint8_t currentLuaScreen = 255;
-
-static void selectLuaScreen(uint8_t screenId) {
-    if (currentLuaScreen != screenId) {
-        switchBus(screenId);
-        currentLuaScreen = screenId;
-    }
-}
-
 void displayClearBuffer(uint8_t screenId) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     displays[screenId]->clearDisplay();
 }
 
 void displayDrawText(uint8_t screenId, int x, int y, const char* text) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     displays[screenId]->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     displays[screenId]->setCursor(x, y);
     displays[screenId]->print(text);
@@ -153,19 +153,19 @@ void displayDrawText(uint8_t screenId, int x, int y, const char* text) {
 
 void displaySetFontSize(uint8_t screenId, int size) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     displays[screenId]->setTextSize(size > 0 ? size : 1);
 }
 
 void displayDrawPixel(uint8_t screenId, int x, int y, bool on) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     displays[screenId]->drawPixel(x, y, on ? SSD1306_WHITE : SSD1306_BLACK);
 }
 
 void displayDrawRect(uint8_t screenId, int x, int y, int w, int h, bool filled) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     if (filled) {
         displays[screenId]->fillRect(x, y, w, h, SSD1306_WHITE);
     } else {
@@ -175,13 +175,13 @@ void displayDrawRect(uint8_t screenId, int x, int y, int w, int h, bool filled) 
 
 void displayDrawLine(uint8_t screenId, int x1, int y1, int x2, int y2) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     displays[screenId]->drawLine(x1, y1, x2, y2, SSD1306_WHITE);
 }
 
 void displayDrawCircle(uint8_t screenId, int x, int y, int r, bool filled) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     if (filled) {
         displays[screenId]->fillCircle(x, y, r, SSD1306_WHITE);
     } else {
@@ -191,6 +191,6 @@ void displayDrawCircle(uint8_t screenId, int x, int y, int r, bool filled) {
 
 void displayRefresh(uint8_t screenId) {
     if (!displayIsValidScreen(screenId)) return;
-    selectLuaScreen(screenId);
+    selectScreen(screenId);
     displays[screenId]->display();
 }

@@ -6,6 +6,8 @@
 
 void luaInit();
 bool luaLoadScript(uint8_t screenId, const char* script);
+void luaQueueScript(uint8_t screenId, const char* script);
+bool luaIsQueueProcessing();
 void luaStopScript(uint8_t screenId, bool clearDisplay = true);
 bool luaHasScript(uint8_t screenId);
 void luaTick();

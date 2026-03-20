@@ -1,10 +1,13 @@
 #include <WiFi.h>
 #include <ArduinoOTA.h>
 #include <time.h>
+#include <esp_task_wdt.h>
 #include "display.h"
 #include "webserver.h"
 #include "config.h"
 #include "lua_runtime.h"
+
+#define WDT_TIMEOUT 10
 
 #define NTP_SERVER "pool.ntp.org"
 #define GMT_OFFSET_SEC 3600
@@ -61,6 +64,16 @@ void setupOTA() {
 
 void setup() {
     Serial.begin(115200);
+
+    // Configure watchdog timer for 10 seconds to prevent timeout during Lua operations
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = WDT_TIMEOUT * 1000,
+        .idle_core_mask = 0,
+        .trigger_panic = true
+    };
+    esp_task_wdt_init(&wdt_config);
+    esp_task_wdt_add(NULL);
+
     configInit();
 
     if (!displayInit()) {
@@ -114,6 +127,8 @@ void setup() {
 }
 
 void loop() {
+    esp_task_wdt_reset();  // Reset watchdog at start of each loop
+
     ArduinoOTA.handle();
     configProcessSerial();
 

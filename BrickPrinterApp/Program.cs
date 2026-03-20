@@ -34,6 +34,7 @@ internal static class Program
         widgetService.RegisterWidget(new SampleTextWidget(textService));
         widgetService.RegisterWidget(new LogoWidget(displayService));
         widgetService.RegisterWidget(new WeatherWidget(displayService));
+        widgetService.RegisterWidget(new StockWidget(displayService));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
 

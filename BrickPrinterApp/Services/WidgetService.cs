@@ -156,13 +156,14 @@ public class WidgetService : IDisposable
             {
                 if (widget is IScriptWidget scriptWidget)
                 {
-                    Console.WriteLine($"Recovery: Resending script to screen {status.Id}");
+                    Console.WriteLine($"Recovery: Resending {scriptWidget.Name} script to screen {status.Id}");
                     var script = scriptWidget.GetScript();
-                    await _transferService.SendScriptAsync(script, scriptWidget.ScriptLanguage, status.Id);
+                    var result = await _transferService.SendScriptAsync(script, scriptWidget.ScriptLanguage, status.Id);
+                    Console.WriteLine($"Recovery result for screen {status.Id}: {(result ? "success" : "failed")}");
                 }
                 else if (widget is IWidget regularWidget)
                 {
-                    Console.WriteLine($"Recovery: Resending widget to screen {status.Id}");
+                    Console.WriteLine($"Recovery: Resending {regularWidget.Name} widget to screen {status.Id}");
                     await SendWidgetContentWithLock(status.Id, regularWidget);
                 }
             }
