@@ -142,6 +142,7 @@ static void handleUploadBody(AsyncWebServerRequest *request, uint8_t *data,
 
 static void handleLuaComplete(AsyncWebServerRequest *request) {
     luaPendingScreenId = request->hasParam("screen") ? request->getParam("screen")->value().toInt() : 0;
+    unsigned long interval = request->hasParam("interval") ? request->getParam("interval")->value().toInt() : 1000;
 
     if (request->hasParam("script", true)) {
         String scriptBody = request->getParam("script", true)->value();
@@ -157,6 +158,9 @@ static void handleLuaComplete(AsyncWebServerRequest *request) {
     }
 
     updateContactTime();
+
+    // Set the interval before queuing
+    luaSetInterval(luaPendingScreenId, interval);
 
     // Queue the script instead of executing it directly
     // This prevents blocking the async_tcp task and causing watchdog timeout

@@ -5,7 +5,7 @@ public record ScreenStatus(int Id, bool Active);
 public interface ITransferService
 {
     Task<bool> SendBinaryDataAsync(byte[] binaryData, int screenId = 0);
-    Task<bool> SendScriptAsync(string script, string language, int screenId = 0);
+    Task<bool> SendScriptAsync(string script, string language, int screenId = 0, int intervalMs = 1000);
     Task<bool> StopScriptAsync(int screenId = 0);
     Task<bool> PingAsync();
     Task<ScreenStatus[]?> PingWithStatusAsync();

@@ -118,7 +118,7 @@ public class TransferService : ITransferService, IDisposable
         }
     }
 
-    public async Task<bool> SendScriptAsync(string script, string language, int screenId = 0)
+    public async Task<bool> SendScriptAsync(string script, string language, int screenId = 0, int intervalMs = 1000)
     {
         try
         {
@@ -133,8 +133,8 @@ public class TransferService : ITransferService, IDisposable
                     };
                     using var content = new FormUrlEncodedContent(formData);
 
-                    var url = _settings.GetScriptUrl(screenId);
-                    Console.WriteLine("Sending script to " + url);
+                    var url = $"{_settings.GetScriptUrl(screenId)}&interval={intervalMs}";
+                    Console.WriteLine($"Sending script to {url} (interval: {intervalMs}ms)");
                     var response = await _httpClient.PostAsync(url, content);
                     return response.IsSuccessStatusCode;
                 });

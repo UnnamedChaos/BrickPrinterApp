@@ -10,6 +10,7 @@ void luaQueueScript(uint8_t screenId, const char* script);
 bool luaIsQueueProcessing();
 void luaStopScript(uint8_t screenId, bool clearDisplay = true);
 bool luaHasScript(uint8_t screenId);
+void luaSetInterval(uint8_t screenId, unsigned long interval);
 void luaTick();
 const char* luaGetLastError();
 

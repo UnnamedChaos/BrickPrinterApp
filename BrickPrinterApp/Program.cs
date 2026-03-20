@@ -37,6 +37,8 @@ internal static class Program
         widgetService.RegisterWidget(new StockWidget(displayService));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
+        widgetService.RegisterScriptWidget(new CyberpunkClockWidget());
+        widgetService.RegisterScriptWidget(new SolarSystemWidget());
 
         // Load saved widget assignments
         widgetService.LoadSavedAssignments();

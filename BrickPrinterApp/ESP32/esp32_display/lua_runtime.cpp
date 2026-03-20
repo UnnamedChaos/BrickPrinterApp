@@ -256,6 +256,11 @@ bool luaHasScript(uint8_t screenId) {
     return screens[screenId].active;
 }
 
+void luaSetInterval(uint8_t screenId, unsigned long interval) {
+    if (screenId >= NUM_DISPLAYS) return;
+    screens[screenId].interval = interval < 50 ? 50 : interval;
+}
+
 void luaTick() {
     if (luaVMBusy) return;
 
