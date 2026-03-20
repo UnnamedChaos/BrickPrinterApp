@@ -11,8 +11,6 @@
 
 bool showingIPScreen = true;
 bool wifiConnected = false;
-unsigned long lastRecoveryCheck = 0;
-const unsigned long RECOVERY_CHECK_INTERVAL = 5000;
 
 void setup() {
     Serial.begin(115200);
@@ -80,12 +78,6 @@ void loop() {
     }
 
     luaTick();
-
-    unsigned long now = millis();
-    if (now - lastRecoveryCheck >= RECOVERY_CHECK_INTERVAL) {
-        lastRecoveryCheck = now;
-        serverRequestRecoveryForEmptyScreens();
-    }
 
     yield();
     delay(10);

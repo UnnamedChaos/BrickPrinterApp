@@ -41,7 +41,6 @@ internal static class Program
         builder.Services.AddSingleton<IDisplayService, DisplayService>();
         builder.Services.AddSingleton<ITextService, RawTextService>();
         builder.Services.AddSingleton<WidgetService>();
-        builder.Services.AddSingleton<RecoveryListenerService>();
 
         // Register TransferService with typed HttpClient
         // Configure handler to avoid stale connection issues with ESP32

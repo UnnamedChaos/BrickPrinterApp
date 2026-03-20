@@ -13,6 +13,5 @@ void serverClearNewDataFlag(uint8_t screenId);
 void serverClearDisplayBuffer(uint8_t screenId);
 bool serverHasFirstContact();
 unsigned long serverGetLastContactAge();
-void serverRequestRecoveryForEmptyScreens();
 
 #endif

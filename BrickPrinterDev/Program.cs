@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,19 +20,6 @@ Directory.CreateDirectory(outputDir);
 
 // Lightweight keep-alive endpoint
 app.MapGet("/ping", () => Results.Text("ok"));
-
-// Recovery endpoint - simulates the BrickPrinterApp recovery listener
-app.MapGet("/recovery", (HttpRequest request) =>
-{
-    if (request.Query.TryGetValue("screen", out var screenParam) && int.TryParse(screenParam, out var screenId))
-    {
-        Console.WriteLine($"Recovery request for screen {screenId} from {request.HttpContext.Connection.RemoteIpAddress}");
-        // In dev mode, we don't have widgets to resend, just acknowledge
-        return Results.Ok(new { message = "Recovery acknowledged (dev mode)", screen = screenId });
-    }
-    Console.WriteLine($"Recovery request for all screens from {request.HttpContext.Connection.RemoteIpAddress}");
-    return Results.Ok(new { message = "Recovery acknowledged for all screens (dev mode)" });
-});
 
 // Status endpoint
 app.MapGet("/status", () => Results.Ok(new
@@ -156,29 +142,12 @@ static Bitmap ConvertBinaryToImage(byte[] binaryData)
     return bitmap;
 }
 
-static void SaveScaledImage(Bitmap original, string filename, int scale)
-{
-    var scaledWidth = original.Width * scale;
-    var scaledHeight = original.Height * scale;
-
-    using var scaled = new Bitmap(scaledWidth, scaledHeight);
-    using var graphics = Graphics.FromImage(scaled);
-
-    // Wichtig: Keine Interpolation für pixelgenaue Skalierung
-    graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
-    graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
-
-    graphics.DrawImage(original, 0, 0, scaledWidth, scaledHeight);
-    scaled.Save(filename, ImageFormat.Png);
-}
-
 static void SaveAsTextFile(byte[] binaryData, string filename)
 {
     const int screenWidth = 128;
     const int screenHeight = 64;
 
     using var writer = new StreamWriter(filename);
-    var idx = 0;
 
     // Reverse the encoding process from DisplayService
     for (var y = 0; y < screenHeight; y++)
