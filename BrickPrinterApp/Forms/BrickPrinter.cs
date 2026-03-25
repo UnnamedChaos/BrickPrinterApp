@@ -56,7 +56,7 @@ public partial class BrickPrinter : Form
     {
         var screenMenu = new ToolStripMenuItem("Bildschirm");
 
-        for (int i = 0; i < SettingService.NumScreens; i++)
+        for (int i = 0; i < _settings.NumScreens; i++)
         {
             var screenIndex = i;
             var item = new ToolStripMenuItem($"Screen {i}")

@@ -16,11 +16,11 @@ public class SettingService
     public string LastComPort { get; set; } = string.Empty;
     public int LastBaudRate { get; set; } = 115200;
     public int TimeOffsetHours { get; set; } = 0;
+    public int NumScreens { get; set; } = 3;
     public string EndpointUrl => $"http://{EspIpAddress}/upload";
     public string PingUrl => $"http://{EspIpAddress}/ping";
     public const int ScreenHeight = 64;
     public const int ScreenWidth = 128;
-    public const int NumScreens = 3;
     public string GetEndpointUrl(int screenId) => $"http://{EspIpAddress}/upload?screen={screenId}";
     public string GetScriptUrl(int screenId) => $"http://{EspIpAddress}/lua?screen={screenId}";
     public string GetStopScriptUrl(int screenId) => $"http://{EspIpAddress}/lua/stop?screen={screenId}";
@@ -42,7 +42,8 @@ public class SettingService
                 WidgetAssignments = WidgetAssignments,
                 LastComPort = LastComPort,
                 LastBaudRate = LastBaudRate,
-                TimeOffsetHours = TimeOffsetHours
+                TimeOffsetHours = TimeOffsetHours,
+                NumScreens = NumScreens
             };
             var json = JsonConvert.SerializeObject(data, Formatting.Indented);
             File.WriteAllText(SettingsFile, json);
@@ -69,6 +70,7 @@ public class SettingService
                     LastComPort = data.LastComPort ?? LastComPort;
                     LastBaudRate = data.LastBaudRate > 0 ? data.LastBaudRate : LastBaudRate;
                     TimeOffsetHours = data.TimeOffsetHours;
+                    NumScreens = data.NumScreens > 0 && data.NumScreens <= 3 ? data.NumScreens : 3;
                 }
             }
         }
@@ -86,5 +88,6 @@ public class SettingService
         public string? LastComPort { get; set; }
         public int LastBaudRate { get; set; }
         public int TimeOffsetHours { get; set; }
+        public int NumScreens { get; set; }
     }
 }

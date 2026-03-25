@@ -24,7 +24,7 @@ public class WidgetService : IDisposable
         _transferService = transferService;
         _settingService = settingService;
 
-        for (int i = 0; i < SettingService.NumScreens; i++)
+        for (int i = 0; i < _settingService.NumScreens; i++)
         {
             _screenWidgets[i] = null;
             _screenTimers[i] = null;

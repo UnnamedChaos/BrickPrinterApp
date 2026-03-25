@@ -55,6 +55,7 @@ public partial class SettingsForm : Form
         InitializeComponentManual();
         txtIpAddress.Text = _settings.EspIpAddress;
         numTimeOffset.Value = _settings.TimeOffsetHours;
+        numDisplayCount.Value = _settings.NumScreens;
         LoadBaudRates();
         LoadComPorts();  // LoadComPorts now handles restoring the last port
     }
@@ -597,6 +598,10 @@ public partial class SettingsForm : Form
 
         var command = $"DISPLAY:{numDisplayCount.Value}:{txtDisplayPins.Text}";
         SendCommand(command);
+
+        // Save the number of screens to settings
+        _settings.NumScreens = (int)numDisplayCount.Value;
+        _settings.Save();
 
         if (MessageBox.Show("DISPLAY Befehl gesendet. ESP32 neu starten?", "Neustart",
             MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)

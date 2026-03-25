@@ -6,14 +6,16 @@ namespace BrickPrinterApp.Forms;
 public class WidgetManagerForm : Form
 {
     private readonly WidgetService _widgetService;
+    private readonly SettingService _settingService;
     private readonly List<ComboBox> _screenDropdowns = new();
     private readonly List<(string Name, object Widget, bool IsScript)> _allWidgets = new();
     private readonly int[] _originalSelections;
 
-    public WidgetManagerForm(WidgetService widgetService)
+    public WidgetManagerForm(WidgetService widgetService, SettingService settingService)
     {
         _widgetService = widgetService;
-        _originalSelections = new int[SettingService.NumScreens];
+        _settingService = settingService;
+        _originalSelections = new int[_settingService.NumScreens];
         BuildWidgetList();
         InitializeComponents();
         LoadCurrentAssignments();
@@ -39,13 +41,12 @@ public class WidgetManagerForm : Form
     private void InitializeComponents()
     {
         Text = "Widget Manager";
-        Size = new Size(350, 200);
         FormBorderStyle = FormBorderStyle.FixedToolWindow;
         StartPosition = FormStartPosition.CenterScreen;
 
         var yOffset = 20;
 
-        for (int i = 0; i < SettingService.NumScreens; i++)
+        for (int i = 0; i < _settingService.NumScreens; i++)
         {
             var label = new Label
             {
@@ -74,10 +75,14 @@ public class WidgetManagerForm : Form
 
             yOffset += 35;
         }
-        
+
         Controls.Add(CreateButton(yOffset, "Anwenden", 20, 90, ApplyChanges));
         Controls.Add(CreateButton(yOffset, "Alle senden", 120, 90, ResendAll));
         Controls.Add(CreateButton(yOffset, "Schließen", 220, 90, Close));
+
+        // Set form height dynamically based on number of screens
+        int formHeight = yOffset + 80;
+        Size = new Size(350, formHeight);
     }
 
     private Button CreateButton(int yOffset, string text,  int size,  int width, Action applyChanges)
@@ -94,7 +99,7 @@ public class WidgetManagerForm : Form
 
     private void LoadCurrentAssignments()
     {
-        for (int i = 0; i < SettingService.NumScreens; i++)
+        for (int i = 0; i < _settingService.NumScreens; i++)
         {
             var currentWidget = _widgetService.GetWidgetForScreen(i);
             var dropdown = _screenDropdowns[i];
@@ -122,7 +127,7 @@ public class WidgetManagerForm : Form
 
     private void ApplyChanges()
     {
-        for (int i = 0; i < SettingService.NumScreens; i++)
+        for (int i = 0; i < _settingService.NumScreens; i++)
         {
             var dropdown = _screenDropdowns[i];
             var selectedIndex = dropdown.SelectedIndex;
@@ -156,7 +161,7 @@ public class WidgetManagerForm : Form
 
     private void ResendAll()
     {
-        for (int i = 0; i < SettingService.NumScreens; i++)
+        for (int i = 0; i < _settingService.NumScreens; i++)
         {
             var dropdown = _screenDropdowns[i];
             var selectedIndex = dropdown.SelectedIndex;
