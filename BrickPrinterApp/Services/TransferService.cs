@@ -122,6 +122,17 @@ public class TransferService : ITransferService, IDisposable
     {
         try
         {
+            // Inject time offset for Lua scripts
+            if (language.Equals("lua", StringComparison.OrdinalIgnoreCase) && _settings.TimeOffsetHours != 0)
+            {
+                Console.WriteLine($"Injecting time offset: {_settings.TimeOffsetHours} hours");
+                script = InjectTimeOffset(script, _settings.TimeOffsetHours);
+            }
+            else if (language.Equals("lua", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("No time offset applied (offset is 0)");
+            }
+
             await ThrottleAsync();
             try
             {
@@ -153,6 +164,30 @@ public class TransferService : ITransferService, IDisposable
             IsConnected = false;
             return false;
         }
+    }
+
+    private string InjectTimeOffset(string script, int offsetHours)
+    {
+        // Prepend time offset wrapper to override hour() function
+        // Use unique backup name to prevent re-wrapping on each script execution
+        var wrapper = $@"-- Time offset: {offsetHours} hours
+        if not __ESP32_ORIGINAL_HOUR__ then
+          __ESP32_ORIGINAL_HOUR__ = hour
+          local _time_offset = {offsetHours}
+          function hour()
+            local h = __ESP32_ORIGINAL_HOUR__() + _time_offset
+            if h < 0 then
+              return h + 24
+            elseif h >= 24 then
+              return h - 24
+            else
+              return h
+            end
+          end
+        end
+
+        ";
+        return wrapper + script;
     }
 
     public async Task<bool> StopScriptAsync(int screenId = 0)

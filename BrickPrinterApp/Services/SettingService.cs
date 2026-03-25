@@ -13,6 +13,9 @@ public class SettingService
     public string EspIpAddress { get; set; } = "localhost:5224";
     public int SelectedScreen { get; set; } = 0;
     public Dictionary<int, string?> WidgetAssignments { get; set; } = new();
+    public string LastComPort { get; set; } = string.Empty;
+    public int LastBaudRate { get; set; } = 115200;
+    public int TimeOffsetHours { get; set; } = 0;
     public string EndpointUrl => $"http://{EspIpAddress}/upload";
     public string PingUrl => $"http://{EspIpAddress}/ping";
     public const int ScreenHeight = 64;
@@ -36,7 +39,10 @@ public class SettingService
             {
                 EspIpAddress = EspIpAddress,
                 SelectedScreen = SelectedScreen,
-                WidgetAssignments = WidgetAssignments
+                WidgetAssignments = WidgetAssignments,
+                LastComPort = LastComPort,
+                LastBaudRate = LastBaudRate,
+                TimeOffsetHours = TimeOffsetHours
             };
             var json = JsonConvert.SerializeObject(data, Formatting.Indented);
             File.WriteAllText(SettingsFile, json);
@@ -60,6 +66,9 @@ public class SettingService
                     EspIpAddress = data.EspIpAddress ?? EspIpAddress;
                     SelectedScreen = data.SelectedScreen;
                     WidgetAssignments = data.WidgetAssignments ?? new Dictionary<int, string?>();
+                    LastComPort = data.LastComPort ?? LastComPort;
+                    LastBaudRate = data.LastBaudRate > 0 ? data.LastBaudRate : LastBaudRate;
+                    TimeOffsetHours = data.TimeOffsetHours;
                 }
             }
         }
@@ -74,5 +83,8 @@ public class SettingService
         public string? EspIpAddress { get; set; }
         public int SelectedScreen { get; set; }
         public Dictionary<int, string?>? WidgetAssignments { get; set; }
+        public string? LastComPort { get; set; }
+        public int LastBaudRate { get; set; }
+        public int TimeOffsetHours { get; set; }
     }
 }

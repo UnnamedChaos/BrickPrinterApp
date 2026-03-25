@@ -88,6 +88,7 @@ void setup() {
         displayShowMessageAll("WiFi not set", "", "USB 115200", "Type HELP");
 
         while (!configHasWiFi()) {
+            esp_task_wdt_reset();
             configProcessSerial();
             delay(100);
         }
@@ -101,6 +102,7 @@ void setup() {
 
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+        esp_task_wdt_reset();
         delay(500);
         configProcessSerial();
         attempts++;
@@ -109,6 +111,7 @@ void setup() {
     if (WiFi.status() != WL_CONNECTED) {
         displayShowMessageAll("WiFi Failed!", "", "Type CLEAR");
         while (WiFi.status() != WL_CONNECTED) {
+            esp_task_wdt_reset();
             if (configProcessSerial()) {
                 delay(500);
                 ESP.restart();
