@@ -1,13 +1,16 @@
 using BrickPrinterApp.Interfaces;
 using BrickPrinterApp.Services;
+using MaterialSkin;
+using MaterialSkin.Controls;
 
 namespace BrickPrinterApp.Forms;
 
-public class WidgetManagerForm : Form
+public class WidgetManagerForm : MaterialForm
 {
     private readonly WidgetService _widgetService;
     private readonly SettingService _settingService;
-    private readonly List<ComboBox> _screenDropdowns = new();
+    private readonly MaterialSkinManager _materialSkinManager;
+    private readonly List<MaterialComboBox> _screenDropdowns = new();
     private readonly List<(string Name, object Widget, bool IsScript)> _allWidgets = new();
     private readonly int[] _originalSelections;
 
@@ -16,6 +19,19 @@ public class WidgetManagerForm : Form
         _widgetService = widgetService;
         _settingService = settingService;
         _originalSelections = new int[_settingService.NumScreens];
+
+        // Initialize Material Skin
+        _materialSkinManager = MaterialSkinManager.Instance;
+        _materialSkinManager.AddFormToManage(this);
+        _materialSkinManager.Theme = MaterialSkinManager.Themes.LIGHT;
+        _materialSkinManager.ColorScheme = new ColorScheme(
+            Primary.BlueGrey800,
+            Primary.BlueGrey900,
+            Primary.BlueGrey500,
+            Accent.LightBlue200,
+            TextShade.WHITE
+        );
+
         BuildWidgetList();
         InitializeComponents();
         LoadCurrentAssignments();
@@ -41,25 +57,25 @@ public class WidgetManagerForm : Form
     private void InitializeComponents()
     {
         Text = "Widget Manager";
-        FormBorderStyle = FormBorderStyle.FixedToolWindow;
         StartPosition = FormStartPosition.CenterScreen;
+        Sizable = false;
 
-        var yOffset = 20;
+        var yOffset = 80; // Account for MaterialForm title bar (64px) + padding
 
         for (int i = 0; i < _settingService.NumScreens; i++)
         {
-            var label = new Label
+            var label = new MaterialLabel
             {
                 Text = $"Screen {i}:",
-                Location = new Point(20, yOffset + 3),
-                AutoSize = true
+                Location = new Point(20, yOffset + 8),
+                AutoSize = true,
+                FontType = MaterialSkinManager.fontType.Subtitle1
             };
 
-            var dropdown = new ComboBox
+            var dropdown = new MaterialComboBox
             {
-                Location = new Point(100, yOffset),
-                Width = 200,
-                DropDownStyle = ComboBoxStyle.DropDownList
+                Location = new Point(120, yOffset),
+                Width = 250
             };
 
             dropdown.Items.Add("(Kein Widget)");
@@ -73,28 +89,32 @@ public class WidgetManagerForm : Form
             Controls.Add(label);
             Controls.Add(dropdown);
 
-            yOffset += 35;
+            yOffset += 50;
         }
 
-        Controls.Add(CreateButton(yOffset, "Anwenden", 20, 90, ApplyChanges));
-        Controls.Add(CreateButton(yOffset, "Alle senden", 120, 90, ResendAll));
-        Controls.Add(CreateButton(yOffset, "Schließen", 220, 90, Close));
+        Controls.Add(CreateButton(yOffset, "Anwenden", 20, 110, ApplyChanges, MaterialButton.MaterialButtonType.Contained));
+        Controls.Add(CreateButton(yOffset, "Alle senden", 140, 120, ResendAll, MaterialButton.MaterialButtonType.Outlined));
+        Controls.Add(CreateButton(yOffset, "Schließen", 270, 100, Close, MaterialButton.MaterialButtonType.Text));
 
         // Set form height dynamically based on number of screens
-        int formHeight = yOffset + 80;
-        Size = new Size(350, formHeight);
+        // Add extra height for MaterialForm title bar (64px)
+        int formHeight = yOffset + 120;
+        Size = new Size(420, formHeight);
+        MaximizeBox = false;
     }
 
-    private Button CreateButton(int yOffset, string text,  int size,  int width, Action applyChanges)
+    private MaterialButton CreateButton(int yOffset, string text, int xPos, int width, Action action, MaterialButton.MaterialButtonType type)
     {
-        var btnApply = new Button
+        var btn = new MaterialButton
         {
             Text = text,
-            Location = new Point(size, yOffset + 10),
-            Width = width
+            Location = new Point(xPos, yOffset + 10),
+            Width = width,
+            Height = 36,
+            Type = type
         };
-        btnApply.Click += (_, _) => applyChanges();
-        return btnApply;
+        btn.Click += (_, _) => action();
+        return btn;
     }
 
     private void LoadCurrentAssignments()

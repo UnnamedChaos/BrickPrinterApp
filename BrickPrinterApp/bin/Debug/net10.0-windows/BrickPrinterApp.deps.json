@@ -8,6 +8,7 @@
     ".NETCoreApp,Version=v10.0": {
       "BrickPrinterApp/1.0.0": {
         "dependencies": {
+          "MaterialSkin.2": "2.1.4",
           "Meadow.Foundation.Graphics.MicroGraphics": "2.5.0.5-beta",
           "Microsoft.Extensions.DependencyInjection": "10.0.2",
           "Microsoft.Extensions.Hosting": "10.0.2",
@@ -17,6 +18,14 @@
         },
         "runtime": {
           "BrickPrinterApp.dll": {}
+        }
+      },
+      "MaterialSkin.2/2.1.4": {
+        "runtime": {
+          "lib/net461/MaterialSkin.dll": {
+            "assemblyVersion": "2.1.2.0",
+            "fileVersion": "2.1.2.0"
+          }
         }
       },
       "Meadow.Contracts/2.5.0.5-beta": {
@@ -648,6 +657,13 @@
       "type": "project",
       "serviceable": false,
       "sha512": ""
+    },
+    "MaterialSkin.2/2.1.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-jcAvxLSzZj4cMlO5baDhLGUjWNbKwuKgk9MQnBmrTXQLtmRHyYly/oJHfFmXLYn3UxFTdAN2nt+fVrxXO5ga1Q==",
+      "path": "materialskin.2/2.1.4",
+      "hashPath": "materialskin.2.2.1.4.nupkg.sha512"
     },
     "Meadow.Contracts/2.5.0.5-beta": {
       "type": "package",

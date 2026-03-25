@@ -14,6 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="MaterialSkin.2" Version="2.1.4" />
         <PackageReference Include="Meadow.Foundation.Graphics.MicroGraphics" Version="2.5.0.5-beta" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2"/>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2"/>

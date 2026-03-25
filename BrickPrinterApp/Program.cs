@@ -35,10 +35,13 @@ internal static class Program
         widgetService.RegisterWidget(new LogoWidget(displayService));
         widgetService.RegisterWidget(new WeatherWidget(displayService));
         widgetService.RegisterWidget(new StockWidget(displayService));
+        widgetService.RegisterWidget(new CpuHeatmapWidget(displayService));
+        widgetService.RegisterWidget(new CpuSimpleWidget(displayService));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
         widgetService.RegisterScriptWidget(new CyberpunkClockWidget());
         widgetService.RegisterScriptWidget(new SolarSystemWidget());
+        widgetService.RegisterScriptWidget(new SquareTimeWidget());
 
         // Load saved widget assignments
         widgetService.LoadSavedAssignments();
@@ -72,7 +75,6 @@ internal static class Program
             });
 
         builder.Services.AddTransient<SettingsForm>();
-        builder.Services.AddTransient<WiFiSetupForm>();
         builder.Services.AddTransient<WidgetManagerForm>();
         builder.Services.AddTransient<BrickPrinter>();
     }

@@ -5,7 +5,8 @@
       "WebFetch(domain:api.tomato.gg)",
       "Bash(cmd.exe:*)",
       "WebFetch(domain:api.open-meteo.com)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cd BrickPrinterApp:*)"
     ]
   }
 }
