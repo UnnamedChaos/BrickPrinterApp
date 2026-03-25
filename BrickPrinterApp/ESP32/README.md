@@ -1,13 +1,14 @@
 # ESP32-C3 Multi-Display Receiver
 
-Receives 1024 bytes of binary display data via HTTP POST and shows it on up to 3x 128x64 SSD1306 I2C OLED displays.
+Receives 1024 bytes of binary display data via HTTP POST and shows it on 1-3x 128x64 SSD1306 I2C OLED displays.
 
 ## Features
 
-- 3 independent displays on different I2C pins
-- WiFi credentials configurable via USB serial (no code changes needed)
+- Configurable 1-3 independent displays with custom I2C pins
+- WiFi credentials and display configuration via USB serial (no code changes needed)
 - **OTA updates** - upload firmware over WiFi (no USB needed after first flash)
 - API accepts `?screen=X` parameter to target specific display
+- Lua scripting support for smooth on-device animations
 - Keep-alive support for fast transfers
 
 ## File Structure
@@ -31,13 +32,17 @@ ESP32/esp32_display/
 
 ## Wiring
 
+**Default Configuration (3 displays)**:
+
 | Display | SDA Pin | SCL Pin |
 |---------|---------|---------|
-| 0       | GPIO 6  | GPIO 7  |
+| 0       | GPIO 10 | GPIO 21 |
 | 1       | GPIO 4  | GPIO 5  |
-| 2       | GPIO 2  | GPIO 3  |
+| 2       | GPIO 8  | GPIO 9  |
 
 All displays: VCC → 3.3V, GND → GND
+
+The pins are fully configurable via serial commands (see Display Configuration below).
 
 ## Initial Setup (USB - only needed once)
 
@@ -84,9 +89,9 @@ upload_port = 192.168.178.xxx
 
 The display shows "OTA Update" with progress during upload.
 
-## WiFi Configuration (USB Serial)
+## Configuration (USB Serial)
 
-**No need to edit code!** WiFi credentials are configured via USB serial and stored in flash.
+**No need to edit code!** WiFi credentials and display setup are configured via USB serial and stored in flash.
 
 1. Connect ESP32 via USB
 2. Open serial monitor (115200 baud)
@@ -95,18 +100,39 @@ The display shows "OTA Update" with progress during upload.
 | Command | Description |
 |---------|-------------|
 | `WIFI:MySSID:MyPassword` | Set WiFi credentials |
+| `DISPLAY:<count>:<sda0>:<scl0>[:<sda1>:<scl1>...]` | Configure displays and pins |
 | `STATUS` | Show current config |
-| `CLEAR` | Clear stored config |
+| `CLEAR` | Clear all stored config |
 | `REBOOT` | Restart ESP32 |
 | `HELP` | Show help |
 
-Example:
+### WiFi Setup Example:
 ```
 WIFI:HomeNetwork:SecretPassword123
 REBOOT
 ```
 
-The display shows "WiFi not configured" until you set credentials.
+### Display Configuration Examples:
+
+**Single display on GPIO 6/7:**
+```
+DISPLAY:1:6:7
+REBOOT
+```
+
+**Three displays (default pins):**
+```
+DISPLAY:3:10:21:4:5:8:9
+REBOOT
+```
+
+**Two displays:**
+```
+DISPLAY:2:6:7:4:5
+REBOOT
+```
+
+The device shows "WiFi not configured" until you set credentials. If no display configuration is set, it uses the default 3-display setup.
 
 ## API Endpoints
 

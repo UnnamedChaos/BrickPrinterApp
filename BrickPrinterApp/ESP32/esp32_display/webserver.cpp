@@ -1,13 +1,14 @@
 #include "webserver.h"
 #include "display.h"
 #include "lua_runtime.h"
+#include "config.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 
 static AsyncWebServer server(SERVER_PORT);
 
-static uint8_t displayBuffers[NUM_DISPLAYS][DISPLAY_BUFFER_SIZE];
-static volatile bool newDataAvailable[NUM_DISPLAYS] = {false, false, false};
+static uint8_t displayBuffers[MAX_DISPLAYS][DISPLAY_BUFFER_SIZE];
+static volatile bool newDataAvailable[MAX_DISPLAYS] = {false};
 static volatile bool firstContactEstablished = false;
 static volatile unsigned long lastContactTime = 0;
 static uint8_t tempBuffer[DISPLAY_BUFFER_SIZE];
@@ -37,23 +38,23 @@ void serverInit() {
 }
 
 bool serverHasNewData(uint8_t screenId) {
-    if (screenId >= NUM_DISPLAYS) return false;
+    if (screenId >= MAX_DISPLAYS) return false;
     return newDataAvailable[screenId];
 }
 
 const uint8_t* serverGetDisplayBuffer(uint8_t screenId) {
-    if (screenId >= NUM_DISPLAYS) return nullptr;
+    if (screenId >= MAX_DISPLAYS) return nullptr;
     return displayBuffers[screenId];
 }
 
 void serverClearNewDataFlag(uint8_t screenId) {
-    if (screenId < NUM_DISPLAYS) {
+    if (screenId < MAX_DISPLAYS) {
         newDataAvailable[screenId] = false;
     }
 }
 
 void serverClearDisplayBuffer(uint8_t screenId) {
-    if (screenId < NUM_DISPLAYS) {
+    if (screenId < MAX_DISPLAYS) {
         memset(displayBuffers[screenId], 0, DISPLAY_BUFFER_SIZE);
         newDataAvailable[screenId] = true;
     }
@@ -72,8 +73,9 @@ static void handlePing(AsyncWebServerRequest *request) {
     updateContactTime();
 
     // Return screen status for smart recovery
+    uint8_t numDisplays = displayGetNumDisplays();
     String json = "{\"screens\":[";
-    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+    for (uint8_t i = 0; i < numDisplays; i++) {
         if (i > 0) json += ",";
         bool hasContent = luaHasScript(i) || newDataAvailable[i];
         json += "{\"id\":" + String(i) + ",\"active\":" + (hasContent ? "true" : "false") + "}";
@@ -87,11 +89,13 @@ static void handleStatus(AsyncWebServerRequest *request) {
     updateContactTime();
     uint8_t screenId = request->hasParam("screen") ? request->getParam("screen")->value().toInt() : 0;
     uint8_t ss = displayCheckAllScreens();
+    uint8_t numDisplays = displayGetNumDisplays();
+    uint8_t expectedMask = (1 << numDisplays) - 1;
 
     String j = "{\"ip\":\"" + WiFi.localIP().toString() + "\",\"rssi\":" + String(WiFi.RSSI());
     j += ",\"heap\":" + String(ESP.getFreeHeap());
-    if (screenId < NUM_DISPLAYS) j += ",\"lua\":" + String(luaHasScript(screenId) ? 1 : 0);
-    j += ",\"ok\":" + String(ss == 0x07 ? 1 : 0) + "}";
+    if (screenId < MAX_DISPLAYS) j += ",\"lua\":" + String(luaHasScript(screenId) ? 1 : 0);
+    j += ",\"ok\":" + String(ss == expectedMask ? 1 : 0) + "}";
     request->send(200, "application/json", j);
 }
 
@@ -106,7 +110,8 @@ static void handleClear(AsyncWebServerRequest *request) {
         luaStopScript(screenId);
         serverClearDisplayBuffer(screenId);
     } else {
-        for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        uint8_t numDisplays = displayGetNumDisplays();
+        for (uint8_t i = 0; i < numDisplays; i++) {
             luaStopScript(i);
             serverClearDisplayBuffer(i);
         }

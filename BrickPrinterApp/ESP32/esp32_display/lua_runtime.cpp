@@ -1,5 +1,6 @@
 #include "lua_runtime.h"
 #include "display.h"
+#include "config.h"
 #include <time.h>
 #include <LuaWrapper.h>
 
@@ -18,8 +19,8 @@ struct LuaScriptQueue {
     bool pending;
 };
 
-static LuaScreen screens[NUM_DISPLAYS];
-static LuaScriptQueue scriptQueue[NUM_DISPLAYS];
+static LuaScreen screens[MAX_DISPLAYS];
+static LuaScriptQueue scriptQueue[MAX_DISPLAYS];
 static char lastError[128] = "";
 static uint8_t currentScreen = 0;
 static volatile bool luaVMBusy = false;
@@ -160,7 +161,7 @@ static bool ensureLuaInitialized(bool forceRecreate = false) {
 }
 
 void luaInit() {
-    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+    for (uint8_t i = 0; i < MAX_DISPLAYS; i++) {
         screens[i].script = "";
         screens[i].active = false;
         screens[i].lastRun = 0;
@@ -171,7 +172,7 @@ void luaInit() {
 }
 
 void luaQueueScript(uint8_t screenId, const char* script) {
-    if (screenId >= NUM_DISPLAYS) return;
+    if (screenId >= MAX_DISPLAYS) return;
     scriptQueue[screenId].screenId = screenId;
     scriptQueue[screenId].script = String(script);
     scriptQueue[screenId].pending = true;
@@ -182,7 +183,7 @@ bool luaIsQueueProcessing() {
 }
 
 bool luaLoadScript(uint8_t screenId, const char* script) {
-    if (screenId >= NUM_DISPLAYS) return false;
+    if (screenId >= MAX_DISPLAYS) return false;
 
     // Wait for any ongoing Lua execution to complete
     while (luaVMBusy) {
@@ -223,7 +224,7 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
 }
 
 void luaStopScript(uint8_t screenId, bool clearDisplay) {
-    if (screenId >= NUM_DISPLAYS) return;
+    if (screenId >= MAX_DISPLAYS) return;
 
     bool wasActive = screens[screenId].active;
     screens[screenId].script = "";
@@ -233,7 +234,7 @@ void luaStopScript(uint8_t screenId, bool clearDisplay) {
 
     if (wasActive) {
         bool anyActive = false;
-        for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        for (uint8_t i = 0; i < MAX_DISPLAYS; i++) {
             if (screens[i].active) { anyActive = true; break; }
         }
         if (!anyActive) {
@@ -252,12 +253,12 @@ void luaStopScript(uint8_t screenId, bool clearDisplay) {
 }
 
 bool luaHasScript(uint8_t screenId) {
-    if (screenId >= NUM_DISPLAYS) return false;
+    if (screenId >= MAX_DISPLAYS) return false;
     return screens[screenId].active;
 }
 
 void luaSetInterval(uint8_t screenId, unsigned long interval) {
-    if (screenId >= NUM_DISPLAYS) return;
+    if (screenId >= MAX_DISPLAYS) return;
     screens[screenId].interval = interval < 50 ? 50 : interval;
 }
 
@@ -268,7 +269,7 @@ void luaTick() {
 
     // Process queued script loads first (one per tick with rate limiting)
     if (now - lastQueueProcessTime >= 200) { // Wait at least 200ms between queue processing
-        for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        for (uint8_t i = 0; i < MAX_DISPLAYS; i++) {
             if (scriptQueue[i].pending) {
                 queueProcessing = true;
                 lastQueueProcessTime = now;
@@ -291,7 +292,7 @@ void luaTick() {
     if (!sharedLua) return;
 
     // Run active scripts on their intervals
-    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+    for (uint8_t i = 0; i < MAX_DISPLAYS; i++) {
         if (!screens[i].active || now - screens[i].lastRun < screens[i].interval) continue;
         screens[i].lastRun = now;
         currentScreen = i;

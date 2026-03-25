@@ -7,16 +7,19 @@
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
-#define NUM_DISPLAYS 3
-#define SDA_PIN_0 10
-#define SCL_PIN_0 21
-#define SDA_PIN_1 4
-#define SCL_PIN_1 5
-#define SDA_PIN_2 8
-#define SCL_PIN_2 9
 #define DISPLAY_BUFFER_SIZE 1024
 
+// Default configuration (3 screens)
+#define DEFAULT_NUM_DISPLAYS 3
+#define DEFAULT_SDA_PIN_0 10
+#define DEFAULT_SCL_PIN_0 21
+#define DEFAULT_SDA_PIN_1 4
+#define DEFAULT_SCL_PIN_1 5
+#define DEFAULT_SDA_PIN_2 8
+#define DEFAULT_SCL_PIN_2 9
+
 bool displayInit();
+uint8_t displayGetNumDisplays();
 void displayShowMessage(uint8_t screenId, const char* line1, const char* line2 = nullptr,
                         const char* line3 = nullptr, const char* line4 = nullptr,
                         const char* line5 = nullptr, const char* line6 = nullptr);

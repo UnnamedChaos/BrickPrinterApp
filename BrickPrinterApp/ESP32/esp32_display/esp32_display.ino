@@ -22,7 +22,8 @@ void setupOTA() {
 
     ArduinoOTA.onStart([]() {
         // Stop lua scripts during OTA
-        for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+        uint8_t numDisplays = displayGetNumDisplays();
+        for (uint8_t i = 0; i < numDisplays; i++) {
             luaStopScript(i);
         }
         String type = (ArduinoOTA.getCommand() == U_FLASH) ? "firmware" : "filesystem";
@@ -132,7 +133,8 @@ void loop() {
     ArduinoOTA.handle();
     configProcessSerial();
 
-    for (uint8_t i = 0; i < NUM_DISPLAYS; i++) {
+    uint8_t numDisplays = displayGetNumDisplays();
+    for (uint8_t i = 0; i < numDisplays; i++) {
         if (serverHasNewData(i)) {
             const uint8_t* buffer = serverGetDisplayBuffer(i);
             if (buffer) displayUpdate(i, buffer);
