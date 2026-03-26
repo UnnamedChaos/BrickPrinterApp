@@ -60,6 +60,8 @@ internal static class Program
         builder.Services.AddSingleton<SettingService>();
         builder.Services.AddSingleton<IDisplayService, DisplayService>();
         builder.Services.AddSingleton<ITextService, RawTextService>();
+        builder.Services.AddSingleton<IActiveWindowService, ActiveWindowService>();
+        builder.Services.AddSingleton<ActiveWindowWatcherService>();
         builder.Services.AddSingleton<WidgetService>();
         builder.Services.AddSingleton<RotationManagerService>();
 
