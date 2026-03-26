@@ -21,6 +21,7 @@ public class SampleTextWidget : IWidget
             "BrickPrinter",
             "Status: OK",
             "Status: OK",
+            "Status: OK",
             $"Zeit: {DateTime.Now:HH:mm:ss}",
             $"Datum: {DateTime.Now:dd.MM.yyyy}"
         };

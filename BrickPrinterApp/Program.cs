@@ -38,6 +38,12 @@ internal static class Program
         widgetService.RegisterWidget(new CpuHeatmapWidget(displayService));
         widgetService.RegisterWidget(new CpuSimpleWidget(displayService));
         widgetService.RegisterWidget(new GpuWidget(displayService));
+        var activeWindowService = host.Services.GetRequiredService<IActiveWindowService>();
+        widgetService.RegisterWidget(new YouTubeWidget(displayService, activeWindowService));
+        var googleAuth = host.Services.GetRequiredService<GoogleAuthService>();
+        // Restore saved Google authentication on startup
+        googleAuth.VerifyConnectionAsync().GetAwaiter().GetResult();
+        widgetService.RegisterWidget(new CalendarWidget(googleAuth));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
         widgetService.RegisterScriptWidget(new CyberpunkClockWidget());
@@ -69,6 +75,7 @@ internal static class Program
         builder.Services.AddSingleton<WidgetService>();
         builder.Services.AddSingleton<RotationManagerService>();
         builder.Services.AddSingleton<ConditionalWidgetManagerService>();
+        builder.Services.AddSingleton<GoogleAuthService>();
 
         // Register TransferService with typed HttpClient
         // Configure handler to avoid stale connection issues with ESP32

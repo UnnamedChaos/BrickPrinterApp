@@ -37,12 +37,13 @@ public class RawTextService : ITextService
             _graphics.Clear(true);
 
             // Adjust font based on line count
+            // Font naming: FontWIDTHxHEIGHT - use matching lineHeight
             var (font, lineHeight) = lines.Length switch
             {
-                <= 3 => ((IFont)new Font12x20(), 20),
+                <= 3 => ((IFont)new Font12x20(), 21),
                 4 => (new Font12x16(), 16),
                 5 => (new Font8x12(), 12),
-                <= 8 => (new Font6x8(), 8),
+                <= 8 => (new Font4x8(), 8),  // Use Font4x8 for better rendering
                 _ => (new Font4x6(), 6)
             };
 

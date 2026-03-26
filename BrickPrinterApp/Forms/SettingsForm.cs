@@ -27,9 +27,10 @@ public partial class SettingsForm : MaterialForm
     // Constructor
     // ============================================
 
-    public SettingsForm(SettingService settings)
+    public SettingsForm(SettingService settings, GoogleAuthService googleAuth)
     {
         _settings = settings;
+        SetGoogleAuthService(googleAuth);
 
         // Initialize Material Skin theme
         _materialSkinManager = MaterialSkinManager.Instance;
@@ -101,10 +102,15 @@ public partial class SettingsForm : MaterialForm
         var tabTime = new TabPage("Uhrzeit");
         InitializeTimeTab(tabTime);
 
+        // Tab 4: Google Account (SettingsForm.GoogleTab.cs)
+        var tabGoogle = new TabPage("Google");
+        InitializeGoogleTab(tabGoogle);
+
         // Add tabs to control
         tabControl.TabPages.Add(tabIp);
         tabControl.TabPages.Add(tabSerial);
         tabControl.TabPages.Add(tabTime);
+        tabControl.TabPages.Add(tabGoogle);
 
         // Link tab selector to tab control
         tabSelector.BaseTabControl = tabControl;
@@ -117,6 +123,13 @@ public partial class SettingsForm : MaterialForm
     // ============================================
     // Form Lifecycle
     // ============================================
+
+    protected override async void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        // Verify Google connection status when form is shown
+        await UpdateGoogleStatusAsync();
+    }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {

@@ -22,6 +22,8 @@
         <PackageReference Include="Newtonsoft.Json" Version="13.0.5-beta1" />
         <PackageReference Include="System.IO.Ports" Version="9.0.3" />
         <PackageReference Include="System.Management" Version="9.0.3" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+        <PackageReference Include="Google.Apis.Calendar.v3" Version="1.69.0.3667" />
     </ItemGroup>
 
     <ItemGroup>
