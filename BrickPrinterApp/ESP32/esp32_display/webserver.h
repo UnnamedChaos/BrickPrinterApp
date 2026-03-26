@@ -8,6 +8,7 @@
 
 void serverInit();
 bool serverHasNewData(uint8_t screenId);
+bool serverHasContent(uint8_t screenId);  // Check if screen has any content (for /ping)
 const uint8_t* serverGetDisplayBuffer(uint8_t screenId);
 void serverClearNewDataFlag(uint8_t screenId);
 void serverClearDisplayBuffer(uint8_t screenId);

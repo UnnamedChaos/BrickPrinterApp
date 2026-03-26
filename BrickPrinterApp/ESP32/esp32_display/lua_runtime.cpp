@@ -185,10 +185,15 @@ bool luaIsQueueProcessing() {
 bool luaLoadScript(uint8_t screenId, const char* script) {
     if (screenId >= MAX_DISPLAYS) return false;
 
-    // Wait for any ongoing Lua execution to complete
+    // Wait for any ongoing Lua execution to complete (with timeout)
+    unsigned long waitStart = millis();
     while (luaVMBusy) {
         yield();
         delay(1);
+        // Timeout after 5 seconds to prevent infinite wait
+        if (millis() - waitStart > 5000) {
+            return false;
+        }
     }
 
     luaVMBusy = true;
@@ -223,6 +228,9 @@ bool luaLoadScript(uint8_t screenId, const char* script) {
     return true;
 }
 
+// Flag to indicate VM should be destroyed in main loop
+static volatile bool pendingVMDestroy = false;
+
 void luaStopScript(uint8_t screenId, bool clearDisplay) {
     if (screenId >= MAX_DISPLAYS) return;
 
@@ -238,16 +246,9 @@ void luaStopScript(uint8_t screenId, bool clearDisplay) {
             if (screens[i].active) { anyActive = true; break; }
         }
         if (!anyActive) {
-            // Wait for any ongoing Lua execution to complete
-            while (luaVMBusy) {
-                yield();
-                delay(1);
-            }
-            luaVMBusy = true;
-            yield(); // Allow watchdog to reset before destroying VM
-            destroyLua();
-            yield(); // Allow watchdog to reset after destroying VM
-            luaVMBusy = false;
+            // Queue VM destruction for main loop instead of blocking here
+            // This prevents watchdog timeout when called from async HTTP handler
+            pendingVMDestroy = true;
         }
     }
 }
@@ -266,6 +267,22 @@ void luaTick() {
     if (luaVMBusy) return;
 
     unsigned long now = millis();
+
+    // Handle pending VM destruction in main loop context (safe, won't block HTTP handler)
+    if (pendingVMDestroy && sharedLua) {
+        bool anyActive = false;
+        for (uint8_t i = 0; i < MAX_DISPLAYS; i++) {
+            if (screens[i].active) { anyActive = true; break; }
+        }
+        if (!anyActive) {
+            luaVMBusy = true;
+            yield();
+            destroyLua();
+            yield();
+            luaVMBusy = false;
+        }
+        pendingVMDestroy = false;
+    }
 
     // Process queued script loads first (one per tick with rate limiting)
     if (now - lastQueueProcessTime >= 200) { // Wait at least 200ms between queue processing
@@ -296,7 +313,9 @@ void luaTick() {
         if (!screens[i].active || now - screens[i].lastRun < screens[i].interval) continue;
         screens[i].lastRun = now;
         currentScreen = i;
+        luaVMBusy = true;  // Mark VM as busy during script execution
         sharedLua->Lua_dostring(&screens[i].script);
+        luaVMBusy = false;
         yield();
     }
 }

@@ -141,13 +141,14 @@ void loop() {
         if (serverHasNewData(i)) {
             const uint8_t* buffer = serverGetDisplayBuffer(i);
             if (buffer) displayUpdate(i, buffer);
-            // Don't clear the flag - it should stay true to indicate this screen has content
-            // Only clear when explicitly clearing the screen or when a Lua script takes over
+            serverClearNewDataFlag(i);  // Clear flag after processing to prevent continuous updates
             showingIPScreen = false;
+            esp_task_wdt_reset();  // Reset watchdog after each display update
         }
     }
 
     luaTick();
+    esp_task_wdt_reset();  // Reset watchdog after Lua tick
 
     yield();
     delay(10);

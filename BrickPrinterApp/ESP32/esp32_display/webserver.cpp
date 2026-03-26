@@ -9,6 +9,7 @@ static AsyncWebServer server(SERVER_PORT);
 
 static uint8_t displayBuffers[MAX_DISPLAYS][DISPLAY_BUFFER_SIZE];
 static volatile bool newDataAvailable[MAX_DISPLAYS] = {false};
+static volatile bool screenHasContent[MAX_DISPLAYS] = {false};  // Track if screen has any content
 static volatile bool firstContactEstablished = false;
 static volatile unsigned long lastContactTime = 0;
 static uint8_t tempBuffer[DISPLAY_BUFFER_SIZE];
@@ -53,10 +54,16 @@ void serverClearNewDataFlag(uint8_t screenId) {
     }
 }
 
+bool serverHasContent(uint8_t screenId) {
+    if (screenId >= MAX_DISPLAYS) return false;
+    return screenHasContent[screenId];
+}
+
 void serverClearDisplayBuffer(uint8_t screenId) {
     if (screenId < MAX_DISPLAYS) {
         memset(displayBuffers[screenId], 0, DISPLAY_BUFFER_SIZE);
         newDataAvailable[screenId] = true;
+        screenHasContent[screenId] = false;  // Cleared screen has no content
     }
 }
 
@@ -77,7 +84,7 @@ static void handlePing(AsyncWebServerRequest *request) {
     String json = "{\"screens\":[";
     for (uint8_t i = 0; i < numDisplays; i++) {
         if (i > 0) json += ",";
-        bool hasContent = luaHasScript(i) || newDataAvailable[i];
+        bool hasContent = luaHasScript(i) || screenHasContent[i];
         json += "{\"id\":" + String(i) + ",\"active\":" + (hasContent ? "true" : "false") + "}";
     }
     json += "]}";
@@ -130,6 +137,7 @@ static void handleUploadComplete(AsyncWebServerRequest *request) {
     luaStopScript(pendingScreenId, false);
     memcpy(displayBuffers[pendingScreenId], tempBuffer, DISPLAY_BUFFER_SIZE);
     newDataAvailable[pendingScreenId] = true;
+    screenHasContent[pendingScreenId] = true;  // Mark screen as having content
     tempBufferIndex = 0;
     request->send(200, "text/plain", "ok");
 }
