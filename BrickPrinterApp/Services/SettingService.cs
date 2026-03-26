@@ -15,6 +15,7 @@ public class SettingService
     public int SelectedScreen { get; set; } = 0;
     public Dictionary<int, string?> WidgetAssignments { get; set; } = new();
     public Dictionary<int, ScreenRotationConfig> RotationConfigs { get; set; } = new();
+    public Dictionary<int, List<ConditionalWidgetConfig>> ConditionalConfigs { get; set; } = new();
     public string LastComPort { get; set; } = string.Empty;
     public int LastBaudRate { get; set; } = 115200;
     public int TimeOffsetHours { get; set; } = 0;
@@ -43,6 +44,7 @@ public class SettingService
                 SelectedScreen = SelectedScreen,
                 WidgetAssignments = WidgetAssignments,
                 RotationConfigs = RotationConfigs,
+                ConditionalConfigs = ConditionalConfigs,
                 LastComPort = LastComPort,
                 LastBaudRate = LastBaudRate,
                 TimeOffsetHours = TimeOffsetHours,
@@ -71,6 +73,7 @@ public class SettingService
                     SelectedScreen = data.SelectedScreen;
                     WidgetAssignments = data.WidgetAssignments ?? new Dictionary<int, string?>();
                     RotationConfigs = data.RotationConfigs ?? new Dictionary<int, ScreenRotationConfig>();
+                    ConditionalConfigs = data.ConditionalConfigs ?? new Dictionary<int, List<ConditionalWidgetConfig>>();
                     LastComPort = data.LastComPort ?? LastComPort;
                     LastBaudRate = data.LastBaudRate > 0 ? data.LastBaudRate : LastBaudRate;
                     TimeOffsetHours = data.TimeOffsetHours;

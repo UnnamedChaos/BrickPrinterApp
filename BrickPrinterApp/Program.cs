@@ -51,6 +51,10 @@ internal static class Program
         var rotationManager = host.Services.GetRequiredService<RotationManagerService>();
         rotationManager.LoadSavedConfigs();
 
+        // Initialize conditional widget manager
+        var conditionalManager = host.Services.GetRequiredService<ConditionalWidgetManagerService>();
+        conditionalManager.Initialize();
+
         var mainForm = host.Services.GetRequiredService<BrickPrinter>();
         Application.Run(mainForm);
     }
@@ -64,6 +68,7 @@ internal static class Program
         builder.Services.AddSingleton<ActiveWindowWatcherService>();
         builder.Services.AddSingleton<WidgetService>();
         builder.Services.AddSingleton<RotationManagerService>();
+        builder.Services.AddSingleton<ConditionalWidgetManagerService>();
 
         // Register TransferService with typed HttpClient
         // Configure handler to avoid stale connection issues with ESP32

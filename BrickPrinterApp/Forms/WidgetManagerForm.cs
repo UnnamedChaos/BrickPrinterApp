@@ -11,6 +11,7 @@ public class WidgetManagerForm : MaterialForm
     private readonly WidgetService _widgetService;
     private readonly SettingService _settingService;
     private readonly RotationManagerService _rotationManager;
+    private readonly ActiveWindowWatcherService _windowWatcher;
     private readonly MaterialSkinManager _materialSkinManager;
     private readonly List<MaterialComboBox> _screenDropdowns = new();
     private readonly List<MaterialCheckbox> _rotationCheckboxes = new();
@@ -19,14 +20,17 @@ public class WidgetManagerForm : MaterialForm
     private readonly List<MaterialButton> _addButtons = new();
     private readonly List<MaterialButton> _removeButtons = new();
     private readonly List<Panel> _rotationPanels = new();
+    private readonly List<GroupBox> _conditionalPanels = new();
+    private readonly List<ListView> _conditionalLists = new();
     private readonly List<(string Name, object Widget, bool IsScript)> _allWidgets = new();
     private readonly int[] _originalSelections;
 
-    public WidgetManagerForm(WidgetService widgetService, SettingService settingService, RotationManagerService rotationManager)
+    public WidgetManagerForm(WidgetService widgetService, SettingService settingService, RotationManagerService rotationManager, ActiveWindowWatcherService windowWatcher)
     {
         _widgetService = widgetService;
         _settingService = settingService;
         _rotationManager = rotationManager;
+        _windowWatcher = windowWatcher;
         _originalSelections = new int[_settingService.NumScreens];
 
         // Initialize Material Skin
@@ -183,15 +187,101 @@ public class WidgetManagerForm : MaterialForm
             yOffset += 150; // Space for rotation panel (even when hidden, for layout)
         }
 
+        // Conditional Widgets Section - separate from per-screen controls
+        var conditionalSectionY = yOffset;
+
+        // Section header
+        var conditionalHeader = new MaterialLabel
+        {
+            Text = "Conditional Widgets (override when process/title matches)",
+            Location = new Point(20, conditionalSectionY),
+            AutoSize = true,
+            FontType = MaterialSkinManager.fontType.Subtitle1
+        };
+        Controls.Add(conditionalHeader);
+        conditionalSectionY += 30;
+
+        // Create conditional panels for each screen
+        for (int i = 0; i < _settingService.NumScreens; i++)
+        {
+            var screenId = i;
+
+            var conditionalPanel = new GroupBox
+            {
+                Text = $"Screen {i}",
+                Location = new Point(20, conditionalSectionY),
+                Size = new Size(520, 130),
+                ForeColor = Color.FromArgb(80, 80, 80)
+            };
+
+            // ListView for conditional widgets
+            var conditionalList = new ListView
+            {
+                Location = new Point(10, 20),
+                Size = new Size(400, 100),
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true
+            };
+            conditionalList.Columns.Add("Widget", 150);
+            conditionalList.Columns.Add("Process", 100);
+            conditionalList.Columns.Add("Title", 100);
+            conditionalList.Columns.Add("Mode", 45);
+
+            // Add button
+            var addCondBtn = new MaterialButton
+            {
+                Text = "+ Add",
+                Location = new Point(420, 20),
+                Width = 90,
+                Height = 30,
+                Type = MaterialButton.MaterialButtonType.Outlined
+            };
+            addCondBtn.Click += (s, e) => ShowAddConditionalDialog(screenId);
+
+            // Edit button
+            var editCondBtn = new MaterialButton
+            {
+                Text = "Edit",
+                Location = new Point(420, 55),
+                Width = 90,
+                Height = 30,
+                Type = MaterialButton.MaterialButtonType.Text
+            };
+            editCondBtn.Click += (s, e) => ShowEditConditionalDialog(screenId);
+
+            // Remove button
+            var removeCondBtn = new MaterialButton
+            {
+                Text = "Remove",
+                Location = new Point(420, 90),
+                Width = 90,
+                Height = 30,
+                Type = MaterialButton.MaterialButtonType.Text
+            };
+            removeCondBtn.Click += (s, e) => RemoveConditionalWidget(screenId);
+
+            conditionalPanel.Controls.Add(conditionalList);
+            conditionalPanel.Controls.Add(addCondBtn);
+            conditionalPanel.Controls.Add(editCondBtn);
+            conditionalPanel.Controls.Add(removeCondBtn);
+
+            _conditionalLists.Add(conditionalList);
+            _conditionalPanels.Add(conditionalPanel);
+            Controls.Add(conditionalPanel);
+
+            conditionalSectionY += 140;
+        }
+
         // Bottom buttons
-        var buttonY = 80 + (_settingService.NumScreens * 200) - 30;
+        var buttonY = conditionalSectionY + 10;
         Controls.Add(CreateButton(buttonY, "Anwenden", 20, 110, ApplyChanges, MaterialButton.MaterialButtonType.Contained));
         Controls.Add(CreateButton(buttonY, "Alle senden", 140, 120, ResendAll, MaterialButton.MaterialButtonType.Outlined));
         Controls.Add(CreateButton(buttonY, "Schließen", 270, 100, Close, MaterialButton.MaterialButtonType.Text));
 
         // Set form size
         int formHeight = buttonY + 80;
-        Size = new Size(460, formHeight);
+        Size = new Size(560, formHeight);
         MaximizeBox = false;
     }
 
@@ -269,10 +359,35 @@ public class WidgetManagerForm : MaterialForm
             }
 
             _originalSelections[i] = dropdown.SelectedIndex;
+
+            // Load conditional config
+            LoadConditionalConfig(i);
         }
 
         // Recalculate form height based on visible panels
         RecalculateFormHeight();
+    }
+
+    private void LoadConditionalConfig(int screenId)
+    {
+        _conditionalLists[screenId].Items.Clear();
+
+        if (_settingService.ConditionalConfigs.TryGetValue(screenId, out var configs))
+        {
+            foreach (var config in configs)
+            {
+                if (!config.IsEnabled && string.IsNullOrEmpty(config.WidgetName))
+                    continue;
+
+                var item = new ListViewItem(config.WidgetName);
+                item.SubItems.Add(config.ProcessName ?? "");
+                item.SubItems.Add(config.WindowTitleContains ?? "");
+                item.SubItems.Add(config.MatchBothConditions ? "AND" : "OR");
+                item.Tag = config;
+                item.ForeColor = config.IsEnabled ? Color.Black : Color.Gray;
+                _conditionalLists[screenId].Items.Add(item);
+            }
+        }
     }
 
     private void OnRotationCheckboxChanged(int screenId)
@@ -325,6 +440,23 @@ public class WidgetManagerForm : MaterialForm
             }
         }
 
+        // Conditional section header
+        foreach (Control c in Controls)
+        {
+            if (c is MaterialLabel lbl && lbl.Text.StartsWith("Conditional Widgets"))
+            {
+                lbl.Location = new Point(20, yOffset);
+            }
+        }
+        yOffset += 30;
+
+        // Conditional panels (always visible)
+        for (int i = 0; i < _settingService.NumScreens; i++)
+        {
+            _conditionalPanels[i].Location = new Point(20, yOffset);
+            yOffset += 140;
+        }
+
         // Move buttons
         var buttonY = yOffset + 10;
         foreach (Control c in Controls)
@@ -340,7 +472,7 @@ public class WidgetManagerForm : MaterialForm
 
         // Resize form
         int formHeight = buttonY + 70;
-        Size = new Size(460, formHeight);
+        Size = new Size(560, formHeight);
     }
 
     private void ShowAddWidgetDialog(int screenId)
@@ -436,7 +568,312 @@ public class WidgetManagerForm : MaterialForm
                 // Apply single widget
                 ApplySingleWidget(i);
             }
+
+            // Apply conditional config
+            ApplyConditionalConfig(i);
         }
+    }
+
+    private void ApplyConditionalConfig(int screenId)
+    {
+        var configs = new List<ConditionalWidgetConfig>();
+
+        foreach (ListViewItem item in _conditionalLists[screenId].Items)
+        {
+            if (item.Tag is ConditionalWidgetConfig config)
+            {
+                configs.Add(config);
+            }
+        }
+
+        _settingService.ConditionalConfigs[screenId] = configs;
+        _settingService.Save();
+    }
+
+    private void ShowAddConditionalDialog(int screenId)
+    {
+        var config = new ConditionalWidgetConfig { IsEnabled = true };
+        if (ShowConditionalEditDialog(config, "Add Conditional Widget"))
+        {
+            var item = new ListViewItem(config.WidgetName);
+            item.SubItems.Add(config.ProcessName ?? "");
+            item.SubItems.Add(config.WindowTitleContains ?? "");
+            item.SubItems.Add(config.MatchBothConditions ? "AND" : "OR");
+            item.Tag = config;
+            item.ForeColor = config.IsEnabled ? Color.Black : Color.Gray;
+            _conditionalLists[screenId].Items.Add(item);
+        }
+    }
+
+    private void ShowEditConditionalDialog(int screenId)
+    {
+        if (_conditionalLists[screenId].SelectedItems.Count == 0)
+        {
+            MessageBox.Show("Please select a conditional widget to edit.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var item = _conditionalLists[screenId].SelectedItems[0];
+        if (item.Tag is ConditionalWidgetConfig config)
+        {
+            if (ShowConditionalEditDialog(config, "Edit Conditional Widget"))
+            {
+                item.Text = config.WidgetName;
+                item.SubItems[1].Text = config.ProcessName ?? "";
+                item.SubItems[2].Text = config.WindowTitleContains ?? "";
+                item.SubItems[3].Text = config.MatchBothConditions ? "AND" : "OR";
+                item.ForeColor = config.IsEnabled ? Color.Black : Color.Gray;
+            }
+        }
+    }
+
+    private bool ShowConditionalEditDialog(ConditionalWidgetConfig config, string title)
+    {
+        var dialog = new MaterialForm();
+        dialog.Text = title;
+        dialog.StartPosition = FormStartPosition.CenterParent;
+        dialog.MaximizeBox = false;
+        dialog.MinimizeBox = false;
+        dialog.Sizable = false;
+        dialog.ShowInTaskbar = false;
+
+        // Apply Material theme to dialog
+        _materialSkinManager.AddFormToManage(dialog);
+
+        var yOffset = 80; // Account for MaterialForm title bar
+
+        // Widget dropdown
+        var widgetLabel = new MaterialLabel
+        {
+            Text = "Widget:",
+            Location = new Point(20, yOffset + 5),
+            AutoSize = true
+        };
+        var widgetDropdown = new MaterialComboBox
+        {
+            Location = new Point(130, yOffset),
+            Width = 320
+        };
+        foreach (var (name, _, _) in _allWidgets)
+        {
+            widgetDropdown.Items.Add(name);
+        }
+        var widgetIndex = _allWidgets.FindIndex(w => w.Name == config.WidgetName);
+        widgetDropdown.SelectedIndex = widgetIndex >= 0 ? widgetIndex : 0;
+
+        yOffset += 55;
+
+        // Recent windows section
+        var recentLabel = new MaterialLabel
+        {
+            Text = "Recent Windows (click to use):",
+            Location = new Point(20, yOffset),
+            AutoSize = true,
+            FontType = MaterialSkinManager.fontType.Subtitle2
+        };
+        yOffset += 25;
+
+        var recentList = new ListView
+        {
+            Location = new Point(20, yOffset),
+            Size = new Size(440, 100),
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = true
+        };
+        recentList.Columns.Add("Process", 120);
+        recentList.Columns.Add("Window Title", 310);
+
+        // Populate with recent windows from watcher
+        foreach (var window in _windowWatcher.RecentWindows)
+        {
+            var item = new ListViewItem(window.ProcessName);
+            item.SubItems.Add(window.WindowTitle);
+            item.Tag = window;
+            recentList.Items.Add(item);
+        }
+
+        yOffset += 110;
+
+        // Process input with combo for suggestions
+        var processLabel = new MaterialLabel
+        {
+            Text = "Process:",
+            Location = new Point(20, yOffset + 5),
+            AutoSize = true
+        };
+        var processInput = new ComboBox
+        {
+            Location = new Point(130, yOffset),
+            Width = 320,
+            DropDownStyle = ComboBoxStyle.DropDown  // Allow text input
+        };
+        // Add unique process names as suggestions
+        var processNames = _windowWatcher.RecentWindows
+            .Select(w => w.ProcessName)
+            .Distinct()
+            .ToList();
+        foreach (var name in processNames)
+        {
+            processInput.Items.Add(name);
+        }
+        // Set current value
+        if (!string.IsNullOrEmpty(config.ProcessName))
+        {
+            processInput.Text = config.ProcessName;
+        }
+
+        yOffset += 55;
+
+        // Title input
+        var titleLabel = new MaterialLabel
+        {
+            Text = "Window Title:",
+            Location = new Point(20, yOffset + 5),
+            AutoSize = true
+        };
+        var titleInput = new TextBox
+        {
+            Location = new Point(130, yOffset),
+            Width = 320,
+            Text = config.WindowTitleContains ?? "",
+            PlaceholderText = "e.g. YouTube, Visual Studio"
+        };
+
+        yOffset += 60;
+
+        // Match mode
+        var matchLabel = new MaterialLabel
+        {
+            Text = "Match Mode:",
+            Location = new Point(20, yOffset + 5),
+            AutoSize = true
+        };
+        var matchDropdown = new MaterialComboBox
+        {
+            Location = new Point(130, yOffset),
+            Width = 150
+        };
+        matchDropdown.Items.AddRange(new object[] { "OR (either)", "AND (both)" });
+        matchDropdown.SelectedIndex = config.MatchBothConditions ? 1 : 0;
+
+        yOffset += 55;
+
+        // Enabled checkbox
+        var enabledCheckbox = new MaterialCheckbox
+        {
+            Text = "Enabled",
+            Location = new Point(130, yOffset),
+            Checked = config.IsEnabled,
+            AutoSize = true
+        };
+
+        yOffset += 45;
+
+        // Buttons
+        var okBtn = new MaterialButton
+        {
+            Text = "Save",
+            Location = new Point(130, yOffset),
+            Width = 100,
+            Type = MaterialButton.MaterialButtonType.Contained,
+            DialogResult = DialogResult.OK
+        };
+
+        var cancelBtn = new MaterialButton
+        {
+            Text = "Cancel",
+            Location = new Point(240, yOffset),
+            Width = 100,
+            Type = MaterialButton.MaterialButtonType.Outlined,
+            DialogResult = DialogResult.Cancel
+        };
+
+        // Handle recent list double-click to populate fields
+        recentList.DoubleClick += (s, e) =>
+        {
+            if (recentList.SelectedItems.Count > 0 && recentList.SelectedItems[0].Tag is ActiveWindowInfo window)
+            {
+                // Set process name directly
+                processInput.Text = window.ProcessName;
+
+                // Set title as suggestion (first 50 chars if long)
+                var titleHint = window.WindowTitle.Length > 50
+                    ? window.WindowTitle.Substring(0, 50)
+                    : window.WindowTitle;
+                titleInput.Text = titleHint;
+            }
+        };
+
+        // Also handle single click for convenience
+        recentList.Click += (s, e) =>
+        {
+            if (recentList.SelectedItems.Count > 0 && recentList.SelectedItems[0].Tag is ActiveWindowInfo window)
+            {
+                processInput.Text = window.ProcessName;
+
+                var titleHint = window.WindowTitle.Length > 50
+                    ? window.WindowTitle.Substring(0, 50)
+                    : window.WindowTitle;
+                titleInput.Text = titleHint;
+            }
+        };
+
+        dialog.Controls.AddRange(new Control[] {
+            widgetLabel, widgetDropdown,
+            recentLabel, recentList,
+            processLabel, processInput,
+            titleLabel, titleInput,
+            matchLabel, matchDropdown,
+            enabledCheckbox,
+            okBtn, cancelBtn
+        });
+        dialog.AcceptButton = okBtn;
+        dialog.CancelButton = cancelBtn;
+
+        // Set form size after adding all controls
+        dialog.Size = new Size(500, yOffset + 80);
+
+        try
+        {
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                var process = processInput.Text?.Trim() ?? "";
+                var windowTitle = titleInput.Text.Trim();
+
+                if (string.IsNullOrEmpty(process) && string.IsNullOrEmpty(windowTitle))
+                {
+                    MessageBox.Show("Please enter a process name or window title.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+
+                config.WidgetName = widgetDropdown.SelectedItem?.ToString() ?? "";
+                config.ProcessName = string.IsNullOrEmpty(process) ? null : process;
+                config.WindowTitleContains = string.IsNullOrEmpty(windowTitle) ? null : windowTitle;
+                config.MatchBothConditions = matchDropdown.SelectedIndex == 1;
+                config.IsEnabled = enabledCheckbox.Checked;
+                return true;
+            }
+
+            return false;
+        }
+        finally
+        {
+            _materialSkinManager.RemoveFormToManage(dialog);
+            dialog.Dispose();
+        }
+    }
+
+    private void RemoveConditionalWidget(int screenId)
+    {
+        if (_conditionalLists[screenId].SelectedItems.Count == 0)
+        {
+            MessageBox.Show("Please select a conditional widget to remove.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var item = _conditionalLists[screenId].SelectedItems[0];
+        _conditionalLists[screenId].Items.Remove(item);
     }
 
     private void ApplyRotationConfig(int screenId)

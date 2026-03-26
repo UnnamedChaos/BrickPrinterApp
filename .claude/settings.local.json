@@ -6,7 +6,8 @@
       "Bash(cmd.exe:*)",
       "WebFetch(domain:api.open-meteo.com)",
       "Bash(find:*)",
-      "Bash(cd BrickPrinterApp:*)"
+      "Bash(cd BrickPrinterApp:*)",
+      "Bash(dotnet clean BrickPrinterApp/BrickPrinterApp.csproj -p:EnableWindowsTargeting=true 2>&1 && dotnet build BrickPrinterApp/BrickPrinterApp.csproj -p:EnableWindowsTargeting=true 2>&1)"
     ]
   }
 }

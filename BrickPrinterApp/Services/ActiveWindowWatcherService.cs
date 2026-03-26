@@ -9,8 +9,27 @@ public class ActiveWindowWatcherService
     private string _lastWindowTitle = string.Empty;
     private string _lastProcessName = string.Empty;
     private bool _isRunning = false;
+    private readonly List<ActiveWindowInfo> _recentWindows = new();
+    private readonly object _historyLock = new();
+    private const int MaxHistorySize = 15;
 
     public int CheckIntervalMs { get; set; } = 1000; // Check every second by default
+
+    public event EventHandler<ActiveWindowInfo>? ActiveWindowChanged;
+
+    /// <summary>
+    /// Gets the last 15 unique active windows (by process name)
+    /// </summary>
+    public IReadOnlyList<ActiveWindowInfo> RecentWindows
+    {
+        get
+        {
+            lock (_historyLock)
+            {
+                return _recentWindows.ToList();
+            }
+        }
+    }
 
     public ActiveWindowWatcherService(IActiveWindowService activeWindowService)
     {
@@ -63,13 +82,46 @@ public class ActiveWindowWatcherService
     {
         var windowInfo = _activeWindowService.GetActiveWindow();
 
-        // Only print if the window has changed
+        // Only process if the window has changed
         if (windowInfo.WindowTitle != _lastWindowTitle || windowInfo.ProcessName != _lastProcessName)
         {
             _lastWindowTitle = windowInfo.WindowTitle;
             _lastProcessName = windowInfo.ProcessName;
 
-            PrintWindowInfo(windowInfo);
+            // Add to history (unique by process name)
+            AddToHistory(windowInfo);
+
+            //PrintWindowInfo(windowInfo);
+
+            // Fire event for subscribers
+            ActiveWindowChanged?.Invoke(this, windowInfo);
+        }
+    }
+
+    private void AddToHistory(ActiveWindowInfo info)
+    {
+        if (string.IsNullOrEmpty(info.ProcessName))
+            return;
+
+        lock (_historyLock)
+        {
+            // Remove existing entry with same process name (to move it to top)
+            _recentWindows.RemoveAll(w => w.ProcessName.Equals(info.ProcessName, StringComparison.OrdinalIgnoreCase));
+
+            // Add at the beginning
+            _recentWindows.Insert(0, new ActiveWindowInfo
+            {
+                ProcessName = info.ProcessName,
+                WindowTitle = info.WindowTitle,
+                ProcessId = info.ProcessId,
+                IsYouTube = info.IsYouTube
+            });
+
+            // Trim to max size
+            while (_recentWindows.Count > MaxHistorySize)
+            {
+                _recentWindows.RemoveAt(_recentWindows.Count - 1);
+            }
         }
     }
 
