@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BrickPrinterApp.Interfaces;
+using BrickPrinterApp.Models;
 using BrickPrinterApp.Services;
 
 namespace BrickPrinterApp.Widgets;
@@ -39,7 +40,6 @@ public class StockWidget : IWidget
 
     public byte[] GetContent()
     {
-        Console.WriteLine($"Fetching new stock data.");
         var stock = _stocks[_currentStockIndex];
 
         // Fetch data for current stock
@@ -204,57 +204,4 @@ public class StockWidget : IWidget
     }
 
     private record StockDefinition(string DisplayName, string Ticker, string Isin);
-
-    private class StockData
-    {
-        public string Ticker { get; set; } = "";
-        public double CurrentPrice { get; set; }
-        public double PreviousClose { get; set; }
-        public string Currency { get; set; } = "USD";
-        public double[] IntradayPrices { get; set; } = Array.Empty<double>();
-    }
-
-    // Yahoo Finance API response classes
-    private class YahooChartResponse
-    {
-        public ChartData? chart { get; set; }
-    }
-
-    private class ChartData
-    {
-        public ChartResult[]? result { get; set; }
-    }
-
-    private class ChartResult
-    {
-        public ChartMeta? meta { get; set; }
-        public ChartIndicators? indicators { get; set; }
-    }
-
-    private class ChartMeta
-    {
-        public string? currency { get; set; }
-        public string? symbol { get; set; }
-        public double regularMarketPrice { get; set; }
-        public double previousClose { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, object>? ExtensionData { get; set; }
-    }
-
-    private class ChartIndicators
-    {
-        public QuoteData[]? quote { get; set; }
-    }
-
-    private class QuoteData
-    {
-        public double?[]? close { get; set; }
-        public double?[]? open { get; set; }
-        public double?[]? high { get; set; }
-        public double?[]? low { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, object>? ExtensionData { get; set; }
-    }
 }

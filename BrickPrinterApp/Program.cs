@@ -37,6 +37,7 @@ internal static class Program
         widgetService.RegisterWidget(new StockWidget(displayService));
         widgetService.RegisterWidget(new CpuHeatmapWidget(displayService));
         widgetService.RegisterWidget(new CpuSimpleWidget(displayService));
+        widgetService.RegisterWidget(new GpuWidget(displayService));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
         widgetService.RegisterScriptWidget(new CyberpunkClockWidget());
@@ -45,6 +46,10 @@ internal static class Program
 
         // Load saved widget assignments
         widgetService.LoadSavedAssignments();
+
+        // Load saved rotation configs
+        var rotationManager = host.Services.GetRequiredService<RotationManagerService>();
+        rotationManager.LoadSavedConfigs();
 
         var mainForm = host.Services.GetRequiredService<BrickPrinter>();
         Application.Run(mainForm);
@@ -56,6 +61,7 @@ internal static class Program
         builder.Services.AddSingleton<IDisplayService, DisplayService>();
         builder.Services.AddSingleton<ITextService, RawTextService>();
         builder.Services.AddSingleton<WidgetService>();
+        builder.Services.AddSingleton<RotationManagerService>();
 
         // Register TransferService with typed HttpClient
         // Configure handler to avoid stale connection issues with ESP32

@@ -129,6 +129,66 @@ public class WidgetService : IDisposable
     }
 
     /// <summary>
+    /// Internal method for rotation - assigns widget without saving to disk
+    /// </summary>
+    internal void AssignWidgetToScreenInternal(int screenId, IWidget? widget)
+    {
+        CancellationTokenSource? cts = null;
+
+        lock (_lock)
+        {
+            StopScreenOperations(screenId);
+            _screenWidgets[screenId] = widget;
+
+            if (widget != null)
+            {
+                cts = new CancellationTokenSource();
+                _screenCts[screenId] = cts;
+            }
+        }
+
+        if (widget != null && cts != null)
+        {
+            _ = SendWidgetAndStartTimer(screenId, widget, cts);
+        }
+        else
+        {
+            _ = _transferService.StopScriptAsync(screenId);
+        }
+        // Note: No SaveCurrentAssignments() - rotation manager handles persistence
+    }
+
+    /// <summary>
+    /// Internal method for rotation - assigns script widget without saving to disk
+    /// </summary>
+    internal void AssignScriptWidgetToScreenInternal(int screenId, IScriptWidget? widget)
+    {
+        CancellationTokenSource? cts = null;
+
+        lock (_lock)
+        {
+            StopScreenOperations(screenId);
+            _screenWidgets[screenId] = widget;
+
+            if (widget != null)
+            {
+                cts = new CancellationTokenSource();
+                _screenCts[screenId] = cts;
+            }
+        }
+
+        if (widget != null && cts != null)
+        {
+            _ = SendScriptContent(screenId, widget, cts.Token);
+        }
+        else
+        {
+            _ = _transferService.StopScriptAsync(screenId);
+        }
+        // Note: No SaveCurrentAssignments() - rotation manager handles persistence
+    }
+
+    /// <summary>
     /// Check screen status and resend widgets for screens that should be active but aren't
     /// </summary>
     public async Task RecoverScreensAsync(ScreenStatus[] screenStatus)

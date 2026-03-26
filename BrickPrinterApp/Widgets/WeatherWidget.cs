@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BrickPrinterApp.Interfaces;
+using BrickPrinterApp.Models;
 using BrickPrinterApp.Services;
 
 namespace BrickPrinterApp.Widgets;
@@ -297,42 +298,5 @@ public class WeatherWidget : IWidget
         var font = new Font("Arial", 8);
         var size = g.MeasureString(text, font);
         DrawText(g, text, (int)((128 - size.Width) / 2), y, font);
-    }
-
-    private class WeatherData
-    {
-        public CurrentWeather? current { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, object>? ExtensionData { get; set; }
-    }
-
-    private class CurrentWeather
-    {
-        public double temperature_2m { get; set; }
-        public int weathercode { get; set; }
-        public double windspeed_10m { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, object>? ExtensionData { get; set; }
-    }
-
-    private class ForecastData
-    {
-        public DailyForecast? daily { get; set; }
-
-        [JsonExtensionData]
-        public Dictionary<string, object>? ExtensionData { get; set; }
-    }
-
-    private class DailyForecast
-    {
-        public string[] time { get; set; } = Array.Empty<string>();
-        public double[] temperature_2m_max { get; set; } = Array.Empty<double>();
-        public double[] temperature_2m_min { get; set; } = Array.Empty<double>();
-        public int[] weathercode { get; set; } = Array.Empty<int>();
-
-        [JsonExtensionData]
-        public Dictionary<string, object>? ExtensionData { get; set; }
     }
 }

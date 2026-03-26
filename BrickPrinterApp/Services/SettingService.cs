@@ -1,3 +1,4 @@
+using BrickPrinterApp.Models;
 using Newtonsoft.Json;
 
 namespace BrickPrinterApp.Services;
@@ -13,6 +14,7 @@ public class SettingService
     public string EspIpAddress { get; set; } = "localhost:5224";
     public int SelectedScreen { get; set; } = 0;
     public Dictionary<int, string?> WidgetAssignments { get; set; } = new();
+    public Dictionary<int, ScreenRotationConfig> RotationConfigs { get; set; } = new();
     public string LastComPort { get; set; } = string.Empty;
     public int LastBaudRate { get; set; } = 115200;
     public int TimeOffsetHours { get; set; } = 0;
@@ -40,6 +42,7 @@ public class SettingService
                 EspIpAddress = EspIpAddress,
                 SelectedScreen = SelectedScreen,
                 WidgetAssignments = WidgetAssignments,
+                RotationConfigs = RotationConfigs,
                 LastComPort = LastComPort,
                 LastBaudRate = LastBaudRate,
                 TimeOffsetHours = TimeOffsetHours,
@@ -67,6 +70,7 @@ public class SettingService
                     EspIpAddress = data.EspIpAddress ?? EspIpAddress;
                     SelectedScreen = data.SelectedScreen;
                     WidgetAssignments = data.WidgetAssignments ?? new Dictionary<int, string?>();
+                    RotationConfigs = data.RotationConfigs ?? new Dictionary<int, ScreenRotationConfig>();
                     LastComPort = data.LastComPort ?? LastComPort;
                     LastBaudRate = data.LastBaudRate > 0 ? data.LastBaudRate : LastBaudRate;
                     TimeOffsetHours = data.TimeOffsetHours;
@@ -78,16 +82,5 @@ public class SettingService
         {
             // Use defaults if we can't load settings
         }
-    }
-
-    private class SettingsData
-    {
-        public string? EspIpAddress { get; set; }
-        public int SelectedScreen { get; set; }
-        public Dictionary<int, string?>? WidgetAssignments { get; set; }
-        public string? LastComPort { get; set; }
-        public int LastBaudRate { get; set; }
-        public int TimeOffsetHours { get; set; }
-        public int NumScreens { get; set; }
     }
 }
