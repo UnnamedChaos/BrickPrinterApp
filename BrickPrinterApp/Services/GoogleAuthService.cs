@@ -1,4 +1,3 @@
-using System.Linq;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
@@ -14,11 +13,15 @@ namespace BrickPrinterApp.Services;
 /// </summary>
 public class GoogleAuthService
 {
-    private static readonly string CredentialsFolder = Path.Combine(
+    // Token storage in AppData (user-specific)
+    private static readonly string TokenFolder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "BrickPrinterApp", "google");
 
-    private static readonly string ClientSecretsFile = Path.Combine(CredentialsFolder, "credentials.json");
+    // Client secrets bundled with app (in app directory)
+    private static readonly string ClientSecretsFile = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "credentials.json");
+
     // FileDataStore saves tokens with this pattern
     private static readonly string TokenFilePattern = "Google.Apis.Auth.OAuth2.Responses.TokenResponse-user";
 
@@ -58,7 +61,7 @@ public class GoogleAuthService
 
     public GoogleAuthService()
     {
-        Directory.CreateDirectory(CredentialsFolder);
+        Directory.CreateDirectory(TokenFolder);
         CheckInitialStatus();
     }
 
@@ -82,23 +85,8 @@ public class GoogleAuthService
 
     private bool HasSavedToken()
     {
-        var tokenFile = Path.Combine(CredentialsFolder, TokenFilePattern);
+        var tokenFile = Path.Combine(TokenFolder, TokenFilePattern);
         return File.Exists(tokenFile);
-    }
-
-    private bool HasRequiredScopes(TokenResponse token)
-    {
-        if (string.IsNullOrEmpty(token.Scope))
-            return false;
-
-        var grantedScopes = token.Scope.Split(' ');
-        // Check that all required scopes are present
-        foreach (var requiredScope in Scopes)
-        {
-            if (!grantedScopes.Contains(requiredScope))
-                return false;
-        }
-        return true;
     }
 
     /// <summary>
@@ -139,15 +127,6 @@ public class GoogleAuthService
                 }
             }
 
-            // Check if token has all required scopes
-            if (!HasRequiredScopes(credential.Token))
-            {
-                // Token missing scopes - need to re-authenticate
-                Logout();
-                _status = GoogleAuthStatus.NotLoggedIn;
-                return false;
-            }
-
             // Get user info
             await FetchUserInfoAsync(credential);
 
@@ -185,7 +164,7 @@ public class GoogleAuthService
                 Scopes,
                 "user",
                 CancellationToken.None,
-                new FileDataStore(CredentialsFolder, true));
+                new FileDataStore(TokenFolder, true));
 
             // Get user info
             await FetchUserInfoAsync(_credential);
@@ -208,7 +187,7 @@ public class GoogleAuthService
         try
         {
             // Delete the Google.Apis.Auth token files
-            var tokenFiles = Directory.GetFiles(CredentialsFolder, "Google.Apis.Auth.*");
+            var tokenFiles = Directory.GetFiles(TokenFolder, "Google.Apis.Auth.*");
             foreach (var file in tokenFiles)
             {
                 File.Delete(file);
@@ -261,7 +240,7 @@ public class GoogleAuthService
             {
                 ClientSecrets = clientSecrets.Secrets,
                 Scopes = Scopes,
-                DataStore = new FileDataStore(CredentialsFolder, true)
+                DataStore = new FileDataStore(TokenFolder, true)
             });
 
             var token = await flow.LoadTokenAsync("user", CancellationToken.None);

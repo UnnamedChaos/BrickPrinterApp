@@ -44,11 +44,12 @@ public class CalendarWidget : IWidget
 
     public byte[] GetContent()
     {
-        Console.WriteLine($"Calendar: GetContent called");
+        Console.WriteLine($"Calendar: GetContent called, auth status = {_googleAuth.Status}");
         lock (_lock)
         {
-            // Fetch new events every 5 minutes
-            if ((DateTime.Now - _lastFetch).TotalMinutes > 5)
+            // Fetch new events every 5 minutes (only if connected)
+            var shouldFetch = (DateTime.Now - _lastFetch).TotalMinutes > 5;
+            if (shouldFetch && _googleAuth.Status == GoogleAuthStatus.Connected)
             {
                 Console.WriteLine("Calendar: Time to fetch events");
                 FetchUpcomingEvents();
