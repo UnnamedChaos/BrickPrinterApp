@@ -75,6 +75,12 @@ public class WidgetService : IDisposable
 
         if (widget != null && cts != null)
         {
+            // Initialize BambuLabWidget if it's being assigned as a regular widget
+            if (widget is BrickPrinterApp.Widgets.BambuLabWidget bambuWidget)
+            {
+                bambuWidget.Initialize();
+            }
+
             _ = SendWidgetAndStartTimer(screenId, widget, cts);
         }
         else
@@ -129,6 +135,39 @@ public class WidgetService : IDisposable
     }
 
     /// <summary>
+    /// Resend the current widget to the screen without changing assignments
+    /// </summary>
+    public async Task ResendCurrentWidgetAsync(int screenId)
+    {
+        object? widget;
+        lock (_lock)
+        {
+            widget = _screenWidgets.GetValueOrDefault(screenId);
+        }
+
+        if (widget == null) return;
+
+        try
+        {
+            if (widget is IScriptWidget scriptWidget)
+            {
+                var script = scriptWidget.GetScript();
+                await _transferService.SendScriptAsync(script, scriptWidget.ScriptLanguage, screenId, scriptWidget.IntervalMs);
+                Console.WriteLine($"Resent script widget {scriptWidget.Name} to screen {screenId}");
+            }
+            else if (widget is IWidget regularWidget)
+            {
+                await SendWidgetContentWithLock(screenId, regularWidget);
+                Console.WriteLine($"Resent widget {regularWidget.Name} to screen {screenId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error resending widget to screen {screenId}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Internal method for rotation - assigns widget without saving to disk
     /// </summary>
     internal void AssignWidgetToScreenInternal(int screenId, IWidget? widget)
@@ -149,6 +188,12 @@ public class WidgetService : IDisposable
 
         if (widget != null && cts != null)
         {
+            // Initialize BambuLabWidget if needed (for conditional/rotation use)
+            if (widget is BrickPrinterApp.Widgets.BambuLabWidget bambuWidget)
+            {
+                bambuWidget.Initialize();
+            }
+
             _ = SendWidgetAndStartTimer(screenId, widget, cts);
         }
         else

@@ -44,6 +44,8 @@ internal static class Program
         // Restore saved Google authentication on startup
         googleAuth.VerifyConnectionAsync().GetAwaiter().GetResult();
         widgetService.RegisterWidget(new CalendarWidget(googleAuth));
+        var settingService = host.Services.GetRequiredService<SettingService>();
+        widgetService.RegisterWidget(new BambuLabWidget(settingService));
         widgetService.RegisterScriptWidget(new LuaClockWidget());
         widgetService.RegisterScriptWidget(new CircularClockWidget());
         widgetService.RegisterScriptWidget(new CyberpunkClockWidget());
@@ -57,9 +59,43 @@ internal static class Program
         var rotationManager = host.Services.GetRequiredService<RotationManagerService>();
         rotationManager.LoadSavedConfigs();
 
-        // Initialize conditional widget manager
+        // Initialize conditional widget manager (old system - process/window based)
         var conditionalManager = host.Services.GetRequiredService<ConditionalWidgetManagerService>();
         conditionalManager.Initialize();
+
+        // Initialize conditional widget monitor (new system - custom logic based)
+        var conditionalMonitor = host.Services.GetRequiredService<ConditionalWidgetMonitorService>();
+        conditionalMonitor.Initialize();
+
+        // ===== CUSTOM CONDITIONAL WIDGETS =====
+        // Register conditional widgets with custom logic here (optional)
+        // These will appear in Widget Manager's conditional section with "Custom" type
+        // Priority: first registered = highest priority
+        // You can also create them via the Widget Manager UI using "+ Add Custom" button
+
+        // Example 1: Always true demo (for testing)
+        // var alwaysTrue = new BrickPrinterApp.Widgets.Conditional.AlwaysTrueConditionalWidget(
+        //     new LogoWidget(displayService));
+        // conditionalMonitor.RegisterConditionalWidget(0, alwaysTrue);
+
+        // Example 2: Show logo widget when "notepad" process is running
+        // var notepadCondition = new BrickPrinterApp.Widgets.Conditional.ProcessRunningConditionalWidget(
+        //     new LogoWidget(displayService), "notepad");
+        // conditionalMonitor.RegisterConditionalWidget(0, notepadCondition);
+
+        // Example 3: Show weather widget during work hours (9 AM - 5 PM)
+        // var workHoursCondition = new BrickPrinterApp.Widgets.Conditional.TimeRangeConditionalWidget(
+        //     new WeatherWidget(displayService),
+        //     new TimeSpan(9, 0, 0),   // 9:00 AM
+        //     new TimeSpan(17, 0, 0)); // 5:00 PM
+        // conditionalMonitor.RegisterConditionalWidget(0, workHoursCondition);
+
+        // Example 4: Show CPU widget on weekdays only
+        // var weekdayCondition = new BrickPrinterApp.Widgets.Conditional.WeekdayConditionalWidget(
+        //     new CpuSimpleWidget(displayService),
+        //     DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+        //     DayOfWeek.Thursday, DayOfWeek.Friday);
+        // conditionalMonitor.RegisterConditionalWidget(0, weekdayCondition);
 
         var mainForm = host.Services.GetRequiredService<BrickPrinter>();
         Application.Run(mainForm);
@@ -75,6 +111,7 @@ internal static class Program
         builder.Services.AddSingleton<WidgetService>();
         builder.Services.AddSingleton<RotationManagerService>();
         builder.Services.AddSingleton<ConditionalWidgetManagerService>();
+        builder.Services.AddSingleton<ConditionalWidgetMonitorService>();
         builder.Services.AddSingleton<GoogleAuthService>();
 
         // Register TransferService with typed HttpClient

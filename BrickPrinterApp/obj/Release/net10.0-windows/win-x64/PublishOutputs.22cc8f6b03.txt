@@ -1,0 +1,2 @@
+G:\Code\Brick\BrickPrinterApp\BrickPrinterApp\bin\Release\net10.0-windows\win-x64\publish\BrickPrinterApp.pdb
+G:\Code\Brick\BrickPrinterApp\BrickPrinterApp\bin\Release\net10.0-windows\win-x64\publish\BrickPrinterApp.exe

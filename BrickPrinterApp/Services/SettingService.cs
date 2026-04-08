@@ -16,10 +16,14 @@ public class SettingService
     public Dictionary<int, string?> WidgetAssignments { get; set; } = new();
     public Dictionary<int, ScreenRotationConfig> RotationConfigs { get; set; } = new();
     public Dictionary<int, List<ConditionalWidgetConfig>> ConditionalConfigs { get; set; } = new();
+    public Dictionary<int, List<CustomConditionalWidgetConfig>> CustomConditionalConfigs { get; set; } = new();
     public string LastComPort { get; set; } = string.Empty;
     public int LastBaudRate { get; set; } = 115200;
     public int TimeOffsetHours { get; set; } = 0;
     public int NumScreens { get; set; } = 3;
+    public string? BambuLabIp { get; set; }
+    public string? BambuLabAccessCode { get; set; }
+    public string? BambuLabSerial { get; set; }
     public string EndpointUrl => $"http://{EspIpAddress}/upload";
     public string PingUrl => $"http://{EspIpAddress}/ping";
     public const int ScreenHeight = 64;
@@ -45,10 +49,14 @@ public class SettingService
                 WidgetAssignments = WidgetAssignments,
                 RotationConfigs = RotationConfigs,
                 ConditionalConfigs = ConditionalConfigs,
+                CustomConditionalConfigs = CustomConditionalConfigs,
                 LastComPort = LastComPort,
                 LastBaudRate = LastBaudRate,
                 TimeOffsetHours = TimeOffsetHours,
-                NumScreens = NumScreens
+                NumScreens = NumScreens,
+                BambuLabIp = BambuLabIp,
+                BambuLabAccessCode = BambuLabAccessCode,
+                BambuLabSerial = BambuLabSerial
             };
             var json = JsonConvert.SerializeObject(data, Formatting.Indented);
             File.WriteAllText(SettingsFile, json);
@@ -74,10 +82,14 @@ public class SettingService
                     WidgetAssignments = data.WidgetAssignments ?? new Dictionary<int, string?>();
                     RotationConfigs = data.RotationConfigs ?? new Dictionary<int, ScreenRotationConfig>();
                     ConditionalConfigs = data.ConditionalConfigs ?? new Dictionary<int, List<ConditionalWidgetConfig>>();
+                    CustomConditionalConfigs = data.CustomConditionalConfigs ?? new Dictionary<int, List<CustomConditionalWidgetConfig>>();
                     LastComPort = data.LastComPort ?? LastComPort;
                     LastBaudRate = data.LastBaudRate > 0 ? data.LastBaudRate : LastBaudRate;
                     TimeOffsetHours = data.TimeOffsetHours;
                     NumScreens = data.NumScreens > 0 && data.NumScreens <= 3 ? data.NumScreens : 3;
+                    BambuLabIp = data.BambuLabIp;
+                    BambuLabAccessCode = data.BambuLabAccessCode;
+                    BambuLabSerial = data.BambuLabSerial;
                 }
             }
         }

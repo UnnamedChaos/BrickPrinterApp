@@ -12,15 +12,17 @@ public partial class BrickPrinter : Form
     private readonly WidgetService _widgetService;
     private readonly ActiveWindowWatcherService _windowWatcher;
     private readonly ConditionalWidgetManagerService _conditionalManager;
+    private readonly ConditionalWidgetMonitorService _conditionalMonitor;
     private NotifyIcon? _trayIcon;
     private ContextMenuStrip? _trayMenu;
 
-    public BrickPrinter(ITransferService transferService, WidgetService widgetService, ActiveWindowWatcherService windowWatcher, ConditionalWidgetManagerService conditionalManager, IHost host)
+    public BrickPrinter(ITransferService transferService, WidgetService widgetService, ActiveWindowWatcherService windowWatcher, ConditionalWidgetManagerService conditionalManager, ConditionalWidgetMonitorService conditionalMonitor, IHost host)
     {
         _transferService = transferService;
         _widgetService = widgetService;
         _windowWatcher = windowWatcher;
         _conditionalManager = conditionalManager;
+        _conditionalMonitor = conditionalMonitor;
         _host = host;
 
         InitializeComponent();
@@ -101,6 +103,7 @@ public partial class BrickPrinter : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         _conditionalManager.Dispose();
+        _conditionalMonitor.Dispose();
         _windowWatcher.Stop();
         _transferService.StopKeepAlive();
         _widgetService.Dispose();

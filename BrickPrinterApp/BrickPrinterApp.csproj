@@ -24,6 +24,7 @@
         <PackageReference Include="System.Management" Version="9.0.3" />
         <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
         <PackageReference Include="Google.Apis.Calendar.v3" Version="1.69.0.3667" />
+        <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     </ItemGroup>
 
     <ItemGroup>
@@ -40,6 +41,9 @@
     <ItemGroup>
       <EmbeddedResource Include="Scripts\*.lua" />
       <EmbeddedResource Include="Resources\logo.png" />
+      <Content Include="Resources\brick.ico">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>
