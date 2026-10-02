@@ -113,6 +113,7 @@ internal static class Program
         builder.Services.AddSingleton<ConditionalWidgetManagerService>();
         builder.Services.AddSingleton<ConditionalWidgetMonitorService>();
         builder.Services.AddSingleton<GoogleAuthService>();
+        builder.Services.AddSingleton<IGmailService, Services.GmailService>();
 
         // Register TransferService with typed HttpClient
         // Configure handler to avoid stale connection issues with ESP32

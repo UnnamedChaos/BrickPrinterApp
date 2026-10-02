@@ -4,6 +4,7 @@ using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Util.Store;
 using Newtonsoft.Json;
+using GoogleGmailService = Google.Apis.Gmail.v1.GmailService;
 
 namespace BrickPrinterApp.Services;
 
@@ -55,6 +56,7 @@ public class GoogleAuthService
     public static readonly string[] Scopes = new[]
     {
         CalendarService.Scope.CalendarReadonly,
+        GoogleGmailService.Scope.GmailReadonly,
         "email",
         "profile"
     };
